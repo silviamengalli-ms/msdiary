@@ -11,7 +11,7 @@ st.title("📊 Il Mio Diario della Giornata")
 st.write("Compila i menu a discesa per calcolare la predizione basata sul tuo storico.")
 
 # Link del tuo Foglio Google esportato in CSV
-URL_FOGLIO = "1eSnvfouOdaL-sakQgwKCItUEKXN-96ECF93KD96cx-E"
+URL_FOGLIO = "URL_FOGLIO = "https://docs.google.com/spreadsheets/d/1eSnvfouOdaL-sakQgwKCItUEKXN-96ECF93KD96cx-E/export?format=csv&gid=0""
 
 # FUNZIONE METEO AUTOMATICA
 def ottieni_temperatura_citta(citta, data_selezionata):
