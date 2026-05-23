@@ -5,7 +5,7 @@ import requests
 
 st.set_page_config(page_title="MS Diary - Predizione", page_icon="📊", layout="centered")
 
-# --- CONFIGURAZIONE GOOGLE MODULI (RIPRISTINATO LINK ORIGINALE CORRETTO) ---
+# --- CONFIGURAZIONE GOOGLE MODULI (LINK ORIGINALE CORRETTO) ---
 URL_MODULO = "https://docs.google.com/forms/d/e/1FAIpQLSfsNrtCcCMKrQ22pM-7NfrW7F9xWvtUSZPNBu83AgV9ZyWtDQ/formResponse"
 
 # ID Domande specifici per questo modulo
@@ -38,8 +38,10 @@ st.title("📊 Il Mio Diario della Giornata")
 
 @st.cache_data(ttl=5)
 def carica_dati(url):
-    try: return pd.read_csv(url)
-    except: return None
+    try: 
+        return pd.read_csv(url)
+    except: 
+        return None
 
 df_storico = carica_dati(URL_FOGLIO_CSV)
 
@@ -82,7 +84,8 @@ if st.button("🔄 Calcola Predizione AI", type="secondary"):
                 if "Energia" in col or "risveq" in col: media_energia_storica = df_storico[col].mean()
                 if "semaforo" in col: media_semaforo_storico = df_storico[col].mean()
                 if "indolenzimento" in col or "dolore" in col: media_dolore_storico = df_storico[col].mean()
-        except: pass
+        except: 
+            pass
 
     differenza_energia = energia - media_energia_storica
     differenza_dolore = dolore_livello - media_dolore_storico
@@ -90,9 +93,12 @@ if st.button("🔄 Calcola Predizione AI", type="secondary"):
     semaforo_reale_calcolato = round(max(1.0, min(10.0, predizione)), 1)
     st.session_state['semaforo_predetto'] = semaforo_reale_calcolato
     
-    if semaforo_reale_calcolato >= 6.0: st.success(f"🟢 Semaforo: **{semaforo_reale_calcolato}**")
-    elif semaforo_reale_calcolato >= 4.0: st.warning(f"🟡 Semaforo: **{semaforo_reale_calcolato}**")
-    else: st.error(f"🔴 Semaforo: **{semaforo_reale_calcolato}**")
+    if semaforo_reale_calcolato >= 6.0: 
+        st.success(f"🟢 Semaforo: **{semaforo_reale_calcolato}**")
+    elif semaforo_reale_calcolato >= 4.0: 
+        st.warning(f"🟡 Semaforo: **{semaforo_reale_calcolato}**")
+    else: 
+        st.error(f"🔴 Semaforo: **{semaforo_reale_calcolato}**")
 
 valore_semaforo_da_salvare = st.session_state.get('semaforo_predetto', 5.0)
 
@@ -107,7 +113,7 @@ if st.button("💾 Registra Giornata nel Database", type="primary"):
     if attivita_scelte:
         stringa_attivita = ", ".join(attivita_scelte)
     else:
-        stringa_attivita = "Riposo totale" # Valore di fallback sicuro se non si seleziona nulla
+        stringa_attivita = "Riposo totale"
 
     payload = {
         ENTRY_ID['temp']: str(round(temp_massima, 1)).replace('.', ','),
@@ -116,3 +122,17 @@ if st.button("💾 Registra Giornata nel Database", type="primary"):
         ENTRY_ID['passi']: str(passi_scelti),
         ENTRY_ID['attivita']: str(stringa_attivita),
         ENTRY_ID['dolore']: str(int(dolore_livello)),
+        ENTRY_ID['semaforo']: str(round(voto_reale, 1)).replace('.', ','),
+        ENTRY_ID['posizione']: str(posizione_corrente)
+    }
+    
+    try:
+        response = requests.post(URL_MODULO, data=payload)
+        if response.status_code == 200:
+            st.balloons()
+            st.success("✅ Dati registrati con successo nel database!")
+        else:
+            st.error(f"❌ Errore {response.status_code}. Google ha dovuto rifiutare i dati.")
+            st.code(payload)
+    except Exception as e:
+        st.error(f"💥 Errore di connessione: {e}")
