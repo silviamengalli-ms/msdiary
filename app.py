@@ -5,18 +5,18 @@ import requests
 
 st.set_page_config(page_title="MS Diary - Predizione", page_icon="📊", layout="centered")
 
-# --- CONFIGURAZIONE GOOGLE MODULI ---
+# --- CONFIGURAZIONE GOOGLE MODULI (ID AGGIORNATI DA SORGENTE) ---
 URL_MODULO = "https://docs.google.com/forms/d/e/1FAIpQLSfsNrtCcCMKrQ22pM-7NfrW7F9xWvtUSZPNBu83AgV9ZyWtDQ/formResponse"
 
 ENTRY_ID = {
-    'temp': 'entry.170668988',
-    'sonno': 'entry.1643446045',
-    'energia': 'entry.1042761612',
-    'passi': 'entry.111812166',
-    'attivita': 'entry.1729676735',
-    'dolore': 'entry.533285942',
-    'semaforo': 'entry.317549883',
-    'posizione': 'entry.507425624'
+    'data_comp': 'entry.2022449610',
+    'posizione': 'entry.1412086707',
+    'temp': 'entry.1900939990',
+    'sonno': 'entry.2076355969',
+    'energia': 'entry.1596414247',
+    'attivita': 'entry.1595201387',
+    'semaforo': 'entry.625659299',
+    'dolore': 'entry.672372933'
 }
 
 # --- CARICAMENTO DATI PER AI ---
@@ -33,7 +33,7 @@ def recupera_meteo_automatico(data_target):
     except:
         return 20.0
 
-st.title("📊 Il Mio Diario della Giornata (TEST)")
+st.title("📊 Il Mio Diario della Giornata")
 
 @st.cache_data(ttl=5)
 def carica_dati(url):
@@ -46,7 +46,7 @@ df_storico = carica_dati(URL_FOGLIO_CSV)
 
 # --- INTERFACCIA UTENTE ---
 st.subheader("🗓️ Inserisci i dati di oggi")
-data_oggi = st.date_input("Data di riferimento per il meteo", datetime.date.today())
+data_oggi = st.date_input("Data di riferimento", datetime.date.today())
 
 temp_automatica = recupera_meteo_automatico(data_oggi)
 
@@ -56,16 +56,16 @@ col1, col2 = st.columns(2)
 with col1:
     posizione_corrente = st.text_input("📍 Ti trovi a:", value="Verona")
     temp_massima = st.number_input("Temperatura meteorologica massima (°C)", value=temp_automatica, step=0.5)
-    sonno_scelto = st.selectbox("Qualità del sonno", ["Soddisfacente", "Discreta", "Scarsa"])
-    energia = st.slider("Energia al risveglio", 1.0, 10.0, 5.0, 0.5)
+    sonno_scelto = st.selectbox("Qualità del sonno", ["soddisfacente", "discreta", "scarsa"])
+    energia = st.slider("Energia al risveglio", 1.0, 10.0, 5.0, 1.0)
 
 with col2:
-    passi_scelti = st.selectbox("Passi", ["Fino a 1.000", "Da 1.001 a 3.000", "Oltre i 3.000"])
+    # Nota: Rimosso il menu passi non presente negli ID del modulo sorgente
     attivita_scelte = st.multiselect(
         "Attività", 
-        ["Sociale", "Piccole commissioni", "Lavoro da casa", "Fisioterapia", "Ufficio", "Visita", "Riposo totale"]
+        ["ufficio", "lavoro da casa", "piccole commissioni", "visita", "fisioterapia", "riposo totale", "sociale"]
     )
-    dolore_livello = st.slider("Livello indolenzimento/dolore", 1.0, 10.0, 1.0, 0.5)
+    dolore_livello = st.slider("Livello indolenzimento/dolore", 1.0, 10.0, 1.0, 1.0)
 
 st.write("---")
 
@@ -106,24 +106,32 @@ voto_reale = st.slider("Semaforo energetico finale da registrare", 1.0, 10.0, fl
 
 st.write("---")
 
-# --- PULSANTE REGISTRA DIAGNOSTICO ---
+# --- PULSANTE REGISTRA DEFINITIVO ---
 if st.button("💾 Registra Giornata nel Database", type="primary"):
     
-    # Payload super-ridotto per isolare il blocco di Google
+    # Costruiamo il payload con i nuovi ID corretti
     payload_lista = [
+        (ENTRY_ID['data_comp'], data_oggi.strftime("%Y-%m-%d")),
+        (ENTRY_ID['posizione'], posizione_corrente),
         (ENTRY_ID['temp'], str(round(temp_massima, 1)).replace('.', ',')),
+        (ENTRY_ID['sonno'], sonno_scelto),
         (ENTRY_ID['energia'], str(int(energia))),
         (ENTRY_ID['dolore'], str(int(dolore_livello))),
-        (ENTRY_ID['semaforo'], str(int(voto_reale))),
-        (ENTRY_ID['posizione'], posizione_corrente)
+        (ENTRY_ID['semaforo'], str(int(voto_reale)))
     ]
     
+    # Aggiungiamo le opzioni multiple per le attività (Google vuole un elemento per ogni scelta)
+    if attivita_scelte:
+        for att in attivita_scelte:
+            payload_lista.append((ENTRY_ID['attivita'], att))
+    else:
+        payload_lista.append((ENTRY_ID['attivita'], ""))
+        
     try:
         response = requests.post(URL_MODULO, data=payload_lista)
         if response.status_code == 200:
-            st.success("Test inviato! Controlla se ORA è apparsa una riga parziale sul Foglio Google.")
-            st.code(payload_lista)
+            st.success("🎉 Giornata registrata con successo nel database!")
         else:
             st.error(f"❌ Errore del server Google: {response.status_code}")
     except Exception as e:
-        st.error(f"💥 Errore di rete: {e}")
+        st.error(f"💥 Errore di connessione: {e}")
