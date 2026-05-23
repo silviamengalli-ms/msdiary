@@ -5,7 +5,7 @@ import requests
 
 st.set_page_config(page_title="MS Diary - Predizione", page_icon="📊", layout="centered")
 
-# --- CONFIGURAZIONE GOOGLE MODULI (AGGIORNATA AL NUOVO FORM) ---
+# --- CONFIGURAZIONE GOOGLE MODULI ---
 URL_MODULO = "https://docs.google.com/forms/d/e/1FAIpQLSclLdf0eA6rO_gJAtCAsgDco_wU60b0q-O2Zcl5D88Zk-fAnQ/formResponse"
 
 ENTRY_ID = {
@@ -22,7 +22,7 @@ ENTRY_ID = {
 # --- CARICAMENTO DATI PER AI ---
 URL_FOGLIO_CSV = "https://docs.google.com/spreadsheets/d/1eSnvfouOdaL-sakQgwKCItUEKXN-96ECF93KD96cx-E/export?format=csv&gid=0"
 
-# --- FUNZIONE METEO AUTOMATICA (VERONA) ---
+# --- FUNZIONE METEO AUTOMATICA ---
 def recupera_meteo_automatico(data_target):
     try:
         data_str = data_target.strftime("%Y-%m-%d")
@@ -37,10 +37,8 @@ st.title("📊 Il Mio Diario della Giornata")
 
 @st.cache_data(ttl=5)
 def carica_dati(url):
-    try: 
-        return pd.read_csv(url)
-    except: 
-        return None
+    try: return pd.read_csv(url)
+    except: return None
 
 df_storico = carica_dati(URL_FOGLIO_CSV)
 
@@ -80,28 +78,20 @@ if st.button("🔄 Calcola Predizione AI", type="secondary"):
     if df_storico is not None and not df_storico.empty:
         try:
             for col in df_storico.columns:
-                if "Energia" in col or "risveq" in col:
-                    media_energia_storica = df_storico[col].mean()
-                if "semaforo" in col:
-                    media_semaforo_storico = df_storico[col].mean()
-                if "indolenzimento" in col or "dolore" in col:
-                    media_dolore_storico = df_storico[col].mean()
-        except:
-            pass
+                if "Energia" in col or "risveq" in col: media_energia_storica = df_storico[col].mean()
+                if "semaforo" in col: media_semaforo_storico = df_storico[col].mean()
+                if "indolenzimento" in col or "dolore" in col: media_dolore_storica = df_storico[col].mean()
+        except: pass
 
     differenza_energia = energia - media_energia_storica
     differenza_dolore = dolore_livello - media_dolore_storico
     predizione = media_semaforo_storico + (differenza_energia * 0.6) - (differenza_dolore * 0.4)
     semaforo_reale_calcolato = round(max(1.0, min(10.0, predizione)), 1)
-    
     st.session_state['semaforo_predetto'] = semaforo_reale_calcolato
     
-    if semaforo_reale_calcolato >= 6.0:
-        st.success(f"🟢 Semaforo Energetico Rilevato: **{semaforo_reale_calcolato}** (Giornata Buona/Carica)")
-    elif semaforo_reale_calcolato >= 4.0:
-        st.warning(f"🟡 Semaforo Energetico Rilevato: **{semaforo_reale_calcolato}** (Giornata Media/Attenzione)")
-    else:
-        st.error(f"🔴 Semaforo Energetico Rilevato: **{semaforo_reale_calcolato}** (Giornata Scarica/Riposo)")
+    if semaforo_reale_calcolato >= 6.0: st.success(f"🟢 Semaforo: **{semaforo_reale_calcolato}**")
+    elif semaforo_reale_calcolato >= 4.0: st.warning(f"🟡 Semaforo: **{semaforo_reale_calcolato}**")
+    else: st.error(f"🔴 Semaforo: **{semaforo_reale_calcolato}**")
 
 valore_semaforo_da_salvare = st.session_state.get('semaforo_predetto', 5.0)
 
@@ -114,14 +104,15 @@ st.write("---")
 if st.button("💾 Registra Giornata nel Database", type="primary"):
     stringa_attivita = ", ".join(attivita_scelte)
     
+    # Inviamo i dati come stringhe standard (proviamo con il punto decimale)
     payload = {
-        ENTRY_ID['temp']: str(temp_massima).replace('.', ','),
+        ENTRY_ID['temp']: str(temp_massima),
         ENTRY_ID['sonno']: str(sonno_scelto),
-        ENTRY_ID['energia']: str(energia).replace('.', ','),
+        ENTRY_ID['energia']: str(energia),
         ENTRY_ID['passi']: str(passi_scelti),
         ENTRY_ID['attivita']: str(stringa_attivita),
         ENTRY_ID['dolore']: str(int(dolore_livello)),
-        ENTRY_ID['semaforo']: str(voto_reale).replace('.', ','),
+        ENTRY_ID['semaforo']: str(voto_reale),
         ENTRY_ID['posizione']: str(posizione_corrente)
     }
     
@@ -129,8 +120,10 @@ if st.button("💾 Registra Giornata nel Database", type="primary"):
         response = requests.post(URL_MODULO, data=payload)
         if response.status_code == 200:
             st.balloons()
-            st.success("✅ Dati inviati al Modulo e registrati sul Foglio Google!")
+            st.success("✅ Dati registrati!")
         else:
-            st.error("❌ Errore nell'invio. Verifica la connessione dell'app.")
-    except:
-        st.error("❌ Errore di connessione con il server di Google.")
+            # 🔎 STAMPA L'ERRORE REALE DI GOOGLE A SCHERMO
+            st.error(f"❌ Errore {response.status_code}. Google ha rifiutato i dati.")
+            st.code(payload) # Ti mostra cosa stava provando a inviare
+    except Exception as e:
+        st.error(f"💥 Errore di connessione: {e}")
