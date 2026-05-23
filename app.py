@@ -103,25 +103,26 @@ st.write("---")
 # --- PULSANTE REGISTRA ---
 if st.button("💾 Registra Giornata nel Database", type="primary"):
     
-    # Invia i dati numerici come NUMERI VERI (float e int), non come stringhe testuali.
-    # Questo permette di superare i controlli di convalida impostati sul modulo Google.
+    # Uniamo le attività in una stringa; se è vuota, mandiamo un testo predefinito per non far saltare l'obbligatorietà
+    if attivita_scelte:
+        stringa_attivita = ", ".join(attivita_scelte)
+    else:
+        stringa_attivita = "Nessuna"
+
+    # Ricostruiamo il payload inviando i dati nel formato testuale corretto per i server italiani di Google
     payload = {
-        ENTRY_ID['temp']: round(temp_massima, 1),
-        ENTRY_ID['sonno']: sonno_scelto,
-        ENTRY_ID['energia']: round(energia, 1),
-        ENTRY_ID['passi']: passi_scelti,
-        ENTRY_ID['dolore']: int(dolore_livello),
-        ENTRY_ID['semaforo']: round(voto_reale, 1),
-        ENTRY_ID['posizione']: posizione_corrente
+        ENTRY_ID['temp']: str(round(temp_massima, 1)).replace('.', ','),
+        ENTRY_ID['sonno']: str(sonno_scelto),
+        ENTRY_ID['energia']: str(round(energia, 1)).replace('.', ','),
+        ENTRY_ID['passi']: str(passi_scelti),
+        ENTRY_ID['attivita']: str(stringa_attivita),
+        ENTRY_ID['dolore']: str(int(dolore_livello)),
+        ENTRY_ID['semaforo']: str(round(voto_reale, 1)).replace('.', ','),
+        ENTRY_ID['posizione']: str(posizione_corrente)
     }
     
-    # Costruiamo la lista finale includendo le attività multiple
-    lista_payload = [(chiave, valore) for chiave, valore in payload.items()]
-    for att in attivita_scelte:
-        lista_payload.append((ENTRY_ID['attivita'], att))
-    
     try:
-        response = requests.post(URL_MODULO, data=lista_payload)
+        response = requests.post(URL_MODULO, data=payload)
         if response.status_code == 200:
             st.balloons()
             st.success("✅ Dati registrati con successo nel database!")
