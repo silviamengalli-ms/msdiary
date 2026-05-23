@@ -65,15 +65,15 @@ note = st.text_area("📝 Note (opzionale):")
 st.subheader("🔮 Stato del Semaforo")
 
 if st.button("🔄 Calcola Predizione AI"):
-    # 1. Base di partenza dinamica (Energia mattutina)
+    # 1. Base di partenza dinamica
     score = 3.0 + (energia * 0.4)
     
-    # 2. Somma pesi attività, sonno e passi
+    # 2. Somma pesi
     score += PESI_SONNO.get(sonno, 0)
     score += PESI_PASSI.get(passi, 0)
     score += sum([PESI_ATTIVITA.get(a, 0) for a in attivita])
     
-    # 3. Logica Termica Esplicita
+    # 3. Logica Termica
     if "riposo totale" not in attivita:
         if temp > 30:
             score -= 2.0 
@@ -87,6 +87,10 @@ if st.button("🔄 Calcola Predizione AI"):
 valore = st.session_state.get('semaforo_predetto', 5.0)
 
 if valore <= 5:
-    st.error(f"### Stato attuale: 🔴 ROSSO (Valore: {valore})")
+    st.error(f"Stato attuale: ROSSO (Valore: {valore})")
 elif 6 <= valore <= 8:
-    st.warning
+    st.warning(f"Stato attuale: GIALLO (Valore: {valore})")
+else:
+    st.success(f"Stato attuale: VERDE (Valore: {valore})")
+
+valore_da_registrare = st.slider("Conferma o modifica valore finale:", 1, 10, int(
