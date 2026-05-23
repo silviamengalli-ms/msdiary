@@ -23,7 +23,12 @@ def recupera_meteo_automatico(data_target):
     except: return 20.0
 
 st.title("📊 Il Mio Diario & Predittore")
-df_storico = pd.read_csv(URL_FOGLIO_CSV) if True else None
+
+# Caricamento dati (gestione errore se il foglio è vuoto)
+try:
+    df_storico = pd.read_csv(URL_FOGLIO_CSV)
+except:
+    df_storico = pd.DataFrame(columns=['Energia', 'Dolore'])
 
 # --- INPUT ---
 col1, col2 = st.columns(2)
@@ -42,12 +47,9 @@ st.subheader("🔮 Calcolo del Semaforo")
 if st.button("🔄 Calcola Predizione AI"):
     media_en = df_storico['Energia'].mean() if 'Energia' in df_storico.columns else 5.0
     media_dol = df_storico['Dolore'].mean() if 'Dolore' in df_storico.columns else 1.0
-    
     predizione = 5.0 + ((energia - media_en) * 0.6) - ((dolore - media_dol) * 0.4)
-    semaforo_pred = round(max(1.0, min(10.0, predizione)), 1)
-    
-    st.session_state['semaforo_predetto'] = semaforo_pred
-    st.write(f"### Il tuo Semaforo predetto: **{semaforo_pred}**")
+    st.session_state['semaforo_predetto'] = round(max(1.0, min(10.0, predizione)), 1)
+    st.write(f"### Il tuo Semaforo predetto: **{st.session_state['semaforo_predetto']}**")
 
 valore_da_registrare = st.slider("Semaforo finale da salvare", 1, 10, int(st.session_state.get('semaforo_predetto', 5.0)))
 
@@ -63,9 +65,16 @@ if st.button("💾 Registra Giornata", type="primary"):
         ENTRY_ID['passi']: passi
     }
     
-    payload_list = list(payload.items()) + [(ENTRY_ID['attivita'], a) for a in attivita]
+    # Aggiunta attività (gestione multiselect)
+    payload_lista = list(payload.items())
+    for a in attivita:
+        payload_lista.append((ENTRY_ID['attivita'], a))
     
-    if requests.post(URL_MODULO, data=payload_list).status_code == 200:
-        st.success("🎉 Salvato!")
-    else:
-        st.error("Errore di registrazione.")
+    try:
+        response = requests.post(URL_MODULO, data=payload_lista)
+        if response.status_code == 200:
+            st.success("🎉 Registrazione riuscita!")
+        else:
+            st.error(f"Errore: {response.status_code}")
+    except Exception as e:
+        st.error(f"Errore di connessione: {e}")
