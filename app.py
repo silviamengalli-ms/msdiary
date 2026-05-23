@@ -20,8 +20,6 @@ ENTRY_ID = {
 }
 
 # --- CARICAMENTO DATI PER AI ---
-# ⚠️ RICORDA: Sostituisci questo link con il tuo link di sola lettura in formato CSV 
-# assicurandoti che il codice 'gid=' corrisponda alla NUOVA scheda creata dal modulo Google!
 URL_FOGLIO_CSV = "https://docs.google.com/spreadsheets/d/1eSnvfouOdaL-sakQgwKCItUEKXN-96ECF93KD96cx-E/export?format=csv&gid=0"
 
 st.title("📊 Il Mio Diario della Giornata")
@@ -35,7 +33,7 @@ def carica_dati(url):
 
 df_storico = carica_dati(URL_FOGLIO_CSV)
 
-# --- INTERFACCIA UTENTE ---
+# --- INTERFACCIA UTENTE REALE (DAL TUO SPREADSHEET) ---
 st.subheader("🗓️ Inserisci i dati di oggi")
 data_oggi = st.date_input("Data", datetime.date.today())
 
@@ -43,30 +41,39 @@ st.write("---")
 col1, col2 = st.columns(2)
 
 with col1:
-    temp_massima = st.number_input("Temp. Massima (°C)", value=20.0, step=0.5)
-    sonno_scelto = st.selectbox("Qualità del sonno", ["Ottima", "Buona", "Media", "Pessima"])
-    energia = st.slider("Energia al risveglio", 1.0, 10.0, 7.0, 0.5)
+    temp_massima = st.number_input("Temperatura meteorologica", value=20.0, step=0.5)
+    sonno_scelto = st.selectbox("Qualità del sonno", ["soddisfacente", "discreta", "scarsa"])
+    energia = st.slider("Energia al risveglio", 1.0, 10.0, 5.0, 0.5)
 
 with col2:
-    passi_scelti = st.selectbox("Passi previsti", ["<5000", "5000-10000", ">10000"])
-    attivita_scelta = st.selectbox("Attività", ["Lavoro", "Sport", "Riposo"])
-    dolore_livello = st.slider("Livello dolore / indolenzimento", 1.0, 10.0, 1.0, 0.5)
+    passi_scelti = st.selectbox("Passi", ["fino a 1000", "da 1001 a 3000", "oltre i 3000"])
+    
+    # Menu a scelta multipla con le tue opzioni esatte
+    attivita_scelte = st.multiselect(
+        "Attività", 
+        ["sociale", "piccole commissioni", "lavoro da casa", "fisioterapia", "ufficio", "visita", "riposo totale"]
+    )
+    
+    dolore_livello = st.slider("Livello indolenzimento/dolore", 1.0, 10.0, 1.0, 0.5)
 
 st.write("---")
-voto_reale = st.slider("Semaforo Reale (da salvare stasera)", 1.0, 10.0, 6.0, 0.5)
+voto_reale = st.slider("Semaforo energetico", 1.0, 10.0, 5.0, 0.5)
 
 st.write("---")
 
 # --- PULSANTE REGISTRA TRAMITE GOOGLE MODULI ---
 if st.button("💾 Registra Giornata nel Database", type="primary"):
+    # Uniamo le attività selezionate in una stringa separata da virgole (es: "ufficio, sociale")
+    stringa_attivita = ", ".join(attivita_scelte)
+    
     payload = {
         ENTRY_ID['data']: data_oggi.strftime("%Y-%m-%d"),
         ENTRY_ID['temp']: temp_massima,
         ENTRY_ID['sonno']: sonno_scelto,
         ENTRY_ID['energia']: energia,
         ENTRY_ID['passi']: passi_scelti,
-        ENTRY_ID['attivita']: attivita_scelta,
-        ENTRY_ID['dolore']: int(dolore_livello),  # La scala lineare accetta solo numeri interi
+        ENTRY_ID['attivita']: stringa_attivita,
+        ENTRY_ID['dolore']: int(dolore_livello),  # Invia il numero intero al modulo
         ENTRY_ID['semaforo']: voto_reale
     }
     
@@ -82,5 +89,4 @@ if st.button("💾 Registra Giornata nel Database", type="primary"):
 
 # --- SEZIONE PREDIZIONE AI ---
 if st.button("🔮 Calcola Predizione AI"):
-    st.info("Funzione AI attiva. Calcolo in corso basato sullo storico...")
-    # Qui re-inseriremo la logica predittiva non appena verifichiamo che il salvataggio funziona alla perfezione
+    st.info("Funzione AI attiva. Calcolo in corso basato sullo storico attuale...")
