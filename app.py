@@ -5,7 +5,7 @@ import requests
 
 st.set_page_config(page_title="MS Diary - Predizione", page_icon="📊", layout="centered")
 
-# --- CONFIGURAZIONE GOOGLE MODULI (MAPPATURA REALE) ---
+# --- CONFIGURAZIONE GOOGLE MODULI ---
 URL_MODULO = "https://docs.google.com/forms/d/e/1FAIpQLSfsNrtCcCMKrQ22pM-7NfrW7F9xWvtUSZPNBu83AgV9ZyWtDQ/formResponse"
 
 ENTRY_ID = {
@@ -16,54 +16,80 @@ ENTRY_ID = {
     'passi': 'entry.111812166',
     'attivita': 'entry.1729676735',
     'dolore': 'entry.533285942',
-    'semaforo': 'entry.317549883'
+    'semaforo': 'entry.317549883',
+    'posizione': 'entry.507425624'  # ID aggiornato per il campo Posizione!
 }
 
 # --- CARICAMENTO DATI PER AI ---
 URL_FOGLIO_CSV = "https://docs.google.com/spreadsheets/d/1eSnvfouOdaL-sakQgwKCItUEKXN-96ECF93KD96cx-E/export?format=csv&gid=0"
 
+# --- FUNZIONE METEO AUTOMATICA ---
+def recupera_meteo_automatico(lat, lon, data_target):
+    try:
+        data_str = data_target.strftime("%Y-%m-%d")
+        url_meteo = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&start_date={data_str}&end_date={data_str}&daily=temperature_2m_max&timezone=Europe/Rome"
+        risposta = requests.get(url_meteo).json()
+        temp_max = risposta['daily']['temperature_2m_max'][0]
+        return float(temp_max) if temp_max is not None else 20.0
+    except:
+        return 20.0
+
+# --- FUNZIONE GEOLOCALIZZAZIONE IP ---
+def rileva_posizione_ip():
+    try:
+        risposta = requests.get("https://ipapi.co/json/").json()
+        citta = risposta.get("city", "Verona")
+        lat = risposta.get("latitude", 45.43)
+        lon = risposta.get("longitude", 10.99)
+        return citta, lat, lon
+    except:
+        return "Verona", 45.43, 10.99
+
 st.title("📊 Il Mio Diario della Giornata")
 
 @st.cache_data(ttl=5)
 def carica_dati(url):
-    try: 
-        return pd.read_csv(url)
-    except: 
-        return None
+    try: return pd.read_csv(url)
+    except: return None
 
 df_storico = carica_dati(URL_FOGLIO_CSV)
 
-# --- INTERFACCIA UTENTE REALE (DAL TUO SPREADSHEET) ---
+# --- LOCALIZZAZIONE AUTOMATICA ---
+citta_rilevata, lat_rilevata, lon_rilevata = rileva_posizione_ip()
+
+# --- INTERFACCIA UTENTE REALE ---
 st.subheader("🗓️ Inserisci i dati di oggi")
 data_oggi = st.date_input("Data", datetime.date.today())
+
+# Il meteo calcola la temperatura in base a dove ti trovi
+temp_automatica = recupera_meteo_automatico(lat_rilevata, lon_rilevata, data_oggi)
 
 st.write("---")
 col1, col2 = st.columns(2)
 
 with col1:
-    temp_massima = st.number_input("Temperatura meteorologica", value=20.0, step=0.5)
+    temp_massima = st.number_input("Temperatura meteorologica massima (°C)", value=temp_automatica, step=0.5)
     sonno_scelto = st.selectbox("Qualità del sonno", ["soddisfacente", "discreta", "scarsa"])
     energia = st.slider("Energia al risveglio", 1.0, 10.0, 5.0, 0.5)
 
 with col2:
     passi_scelti = st.selectbox("Passi", ["fino a 1000", "da 1001 a 3000", "oltre i 3000"])
-    
-    # Menu a scelta multipla con le tue opzioni esatte
     attivita_scelte = st.multiselect(
         "Attività", 
         ["sociale", "piccole commissioni", "lavoro da casa", "fisioterapia", "ufficio", "visita", "riposo totale"]
     )
-    
     dolore_livello = st.slider("Livello indolenzimento/dolore", 1.0, 10.0, 1.0, 0.5)
 
 st.write("---")
+# Campo posizione precompilato con la città rilevata automaticamente
+posizione_corrente = st.text_input("📍 Ti trovi a:", value=citta_rilevata)
+
 voto_reale = st.slider("Semaforo energetico", 1.0, 10.0, 5.0, 0.5)
 
 st.write("---")
 
 # --- PULSANTE REGISTRA TRAMITE GOOGLE MODULI ---
 if st.button("💾 Registra Giornata nel Database", type="primary"):
-    # Uniamo le attività selezionate in una stringa separata da virgole (es: "ufficio, sociale")
     stringa_attivita = ", ".join(attivita_scelte)
     
     payload = {
@@ -73,8 +99,9 @@ if st.button("💾 Registra Giornata nel Database", type="primary"):
         ENTRY_ID['energia']: energia,
         ENTRY_ID['passi']: passi_scelti,
         ENTRY_ID['attivita']: stringa_attivita,
-        ENTRY_ID['dolore']: int(dolore_livello),  # Invia il numero intero al modulo
-        ENTRY_ID['semaforo']: voto_reale
+        ENTRY_ID['dolore']: int(dolore_livello),
+        ENTRY_ID['semaforo']: voto_reale,
+        ENTRY_ID['posizione']: posizione_corrente
     }
     
     try:
