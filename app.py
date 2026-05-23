@@ -98,22 +98,4 @@ if st.button("🔄 Calcola Predizione AI", type="secondary"):
     
     if semaforo_reale_calcolato >= 6.0:
         st.success(f"🟢 Semaforo Energetico Rilevato: **{semaforo_reale_calcolato}** (Giornata Buona/Carica)")
-    elif semaforo_reale_calcolato >= 4.0:
-        st.warning(f"🟡 Semaforo Energetico Rilevato: **{semaforo_reale_calcolato}** (Giornata Media/Attenzione)")
-    else:
-        st.error(f"🔴 Semaforo Energetico Rilevato: **{semaforo_reale_calcolato}** (Giornata Scarica/Riposo)")
-
-valore_semaforo_da_salvare = st.session_state.get('semaforo_predetto', 5.0)
-
-st.write("---")
-voto_reale = st.slider("Semaforo energetico finale da registrare", 1.0, 10.0, float(valore_semaforo_da_salvare), 0.5)
-
-st.write("---")
-
-# --- PULSANTE REGISTRA ---
-if st.button("💾 Registra Giornata nel Database", type="primary"):
-    stringa_attivita = ", ".join(attivita_scelte)
-    
-    # Payload mappato sui NUOVI codici esatti del modulo corrente
-    payload = {
-        ENTRY_ID['temp']: str(temp_massima).replace('.', ','),
+    elif semaforo_
