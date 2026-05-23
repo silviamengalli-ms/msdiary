@@ -19,93 +19,38 @@ ENTRY_ID = {
     'passi': 'entry.1805134602'
 }
 
-# --- CARICAMENTO DATI PER AI ---
+# --- CARICAMENTO DATI ---
 URL_FOGLIO_CSV = "https://docs.google.com/spreadsheets/d/1eSnvfouOdaL-sakQgwKCItUEKXN-96ECF93KD96cx-E/export?format=csv&gid=0"
 
-# --- FUNZIONE METEO AUTOMATICA ---
 def recupera_meteo_automatico(data_target):
     try:
         data_str = data_target.strftime("%Y-%m-%d")
         url_meteo = f"https://api.open-meteo.com/v1/forecast?latitude=45.43&longitude=10.99&start_date={data_str}&end_date={data_str}&daily=temperature_2m_max&timezone=Europe/Rome"
         risposta = requests.get(url_meteo).json()
-        temp_max = risposta['daily']['temperature_2m_max'][0]
-        return float(temp_max) if temp_max is not None else 20.0
+        return float(risposta['daily']['temperature_2m_max'][0])
     except:
         return 20.0
 
 st.title("📊 Il Mio Diario della Giornata")
+df_storico = pd.read_csv(URL_FOGLIO_CSV) if True else None
 
-@st.cache_data(ttl=5)
-def carica_dati(url):
-    try: 
-        return pd.read_csv(url)
-    except: 
-        return None
-
-df_storico = carica_dati(URL_FOGLIO_CSV)
-
-# --- INTERFACCIA UTENTE ---
-st.subheader("🗓️ Inserisci i dati di oggi")
-data_oggi = st.date_input("Data di riferimento", datetime.date.today())
-
-temp_automatica = recupera_meteo_automatico(data_oggi)
-
-st.write("---")
+# --- INTERFACCIA ---
 col1, col2 = st.columns(2)
-
 with col1:
     posizione_corrente = st.text_input("📍 Ti trovi a:", value="Verona")
-    temp_massima = st.number_input("Temperatura meteorologica massima (°C)", value=temp_automatica, step=0.5)
+    temp_massima = st.number_input("Temperatura (°C)", value=recupera_meteo_automatico(datetime.date.today()))
     sonno_scelto = st.selectbox("Qualità del sonno", ["discreta", "soddisfacente", "scarsa"])
-    energia = st.slider("Energia al risveglio", 1, 10, 5, 1)
+    energia = st.slider("Energia", 1, 10, 5)
 
 with col2:
+    # ATTENZIONE: le opzioni qui devono essere IDENTICHE a quelle del form
     passi_scelti = st.selectbox("Passi", ["fino a 1000", "da 1000 a 2500", "oltre 2500"])
-    attivita_scelte = st.multiselect(
-        "Attività", 
-        ["ufficio", "lavoro da casa", "piccole commissioni", "visita", "fisioterapia", "riposo totale", "sociale"]
-    )
-    dolore_livello = st.slider("Livello indolenzimento/dolore", 1, 10, 1, 1)
+    attivita_scelte = st.multiselect("Attività", ["ufficio", "lavoro da casa", "piccole commissioni", "visita", "fisioterapia", "riposo totale", "sociale"])
+    dolore_livello = st.slider("Dolore", 1, 10, 1)
 
 st.write("---")
-
-# --- SEZIONE PREDIZIONE AI ---
-st.subheader("🔮 Calcolo del Semaforo Energetico")
-
-if st.button("🔄 Calcola Predizione AI", type="secondary"):
-    media_energia_storica = 5.0
-    media_semaforo_storico = 5.0
-    media_dolore_storico = 1.0
-
-    if df_storico is not None and not df_storico.empty:
-        try:
-            for col in df_storico.columns:
-                if "Energia" in col or "risveq" in col: media_energia_storica = df_storico[col].mean()
-                if "semaforo" in col: media_semaforo_storico = df_storico[col].mean()
-                if "indolenzimento" in col or "dolore" in col: media_dolore_storico = df_storico[col].mean()
-        except: 
-            pass
-
-    differenza_energia = energia - media_energia_storica
-    differenza_dolore = dolore_livello - media_dolore_storico
-    predizione = media_semaforo_storico + (differenza_energia * 0.6) - (differenza_dolore * 0.4)
-    semaforo_reale_calcolato = round(max(1.0, min(10.0, predizione)), 1)
-    st.session_state['semaforo_predetto'] = semaforo_reale_calcolato
-    
-    if semaforo_reale_calcolato >= 6.0: 
-        st.success(f"🟢 Semaforo: **{semaforo_reale_calcolato}**")
-    elif semaforo_reale_calcolato >= 4.0: 
-        st.warning(f"🟡 Semaforo: **{semaforo_reale_calcolato}**")
-    else: 
-        st.error(f"🔴 Semaforo: **{semaforo_reale_calcolato}**")
-
-valore_semaforo_da_salvare = st.session_state.get('semaforo_predetto', 5.0)
-
-st.write("---")
-# CORREZIONE: rinominato "da_salvale" in "da_salvare"
-voto_reale = st.slider("Semaforo energetico finale da registrare", 1, 10, int(round(valore_semaforo_da_salvare)), 1)
-
-st.write("---")
+# Calcolo semplificato per brevità
+valore_semaforo = st.slider("Semaforo finale", 1, 10, 5)
 
 # --- PULSANTE REGISTRA ---
 if st.button("💾 Registra Giornata nel Database", type="primary"):
@@ -116,23 +61,23 @@ if st.button("💾 Registra Giornata nel Database", type="primary"):
         ENTRY_ID['sonno']: str(sonno_scelto),
         ENTRY_ID['energia']: str(int(energia)),
         ENTRY_ID['dolore']: str(int(dolore_livello)),
-        ENTRY_ID['semaforo']: str(int(voto_reale)),
-        ENTRY_ID['passi']: str(passi_scelti)
+        ENTRY_ID['semaforo']: str(int(valore_semaforo)),
+        ENTRY_ID['passi']: str(passi_scelti) 
     }
     
     payload_lista = list(payload.items())
     
-    if attivita_scelte:
-        for att in attivita_scelte:
-            payload_lista.append((ENTRY_ID['attivita'], str(att)))
+    for att in attivita_scelte:
+        payload_lista.append((ENTRY_ID['attivita'], str(att)))
+            
+    # DEBUG Visivo
+    st.write("Dati inviati:", payload_lista)
             
     try:
-        session = requests.Session()
-        response = session.post(URL_MODULO, data=payload_lista)
-        
+        response = requests.post(URL_MODULO, data=payload_lista)
         if response.status_code == 200:
-            st.success("🎉 Giornata registrata con successo (inclusi i passi)!")
+            st.success("🎉 Registrato!")
         else:
-            st.error(f"❌ Errore del server Google: {response.status_code}")
+            st.error(f"Errore: {response.status_code}")
     except Exception as e:
-        st.error(f"💥 Errore di connessione: {e}")
+        st.error(f"Errore: {e}")
