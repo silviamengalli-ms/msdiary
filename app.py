@@ -9,7 +9,6 @@ st.set_page_config(page_title="MS Diary - Predizione", page_icon="📊", layout=
 URL_MODULO = "https://docs.google.com/forms/d/e/1FAIpQLSfsNrtCcCMKrQ22pM-7NfrW7F9xWvtUSZPNBu83AgV9ZyWtDQ/formResponse"
 
 ENTRY_ID = {
-    'data': 'entry.811568478',
     'temp': 'entry.170668988',
     'sonno': 'entry.1643446045',
     'energia': 'entry.1042761612',
@@ -39,7 +38,7 @@ st.title("📊 Il Mio Diario della Giornata")
 @st.cache_data(ttl=5)
 def carica_dati(url):
     try: 
-        return pd.read_csv(url).dropna(subset=["Data", "semaforo energetico"])
+        return pd.read_csv(url)
     except: 
         return None
 
@@ -47,7 +46,7 @@ df_storico = carica_dati(URL_FOGLIO_CSV)
 
 # --- INTERFACCIA UTENTE REALE ---
 st.subheader("🗓️ Inserisci i dati di oggi")
-data_oggi = st.date_input("Data", datetime.date.today())
+data_oggi = st.date_input("Data di riferimento per il meteo", datetime.date.today())
 
 temp_automatica = recupera_meteo_automatico(data_oggi)
 
@@ -74,33 +73,35 @@ st.write("---")
 st.subheader("🔮 Calcolo del Semaforo Energetico")
 
 if st.button("🔄 Calcola Predizione AI", type="secondary"):
+    media_energia_storica = 5.0
+    media_semaforo_storico = 5.0
+    media_dolore_storico = 1.0
+
     if df_storico is not None and not df_storico.empty:
         try:
-            media_energia_storica = df_storico["Energia al risvegl"].mean() if "Energia al risvegl" in df_storico.columns else 5.0
-            media_semaforo_storico = df_storico["semaforo energetico"].mean()
-            
-            differenza_energia = energia - media_energia_storica
-            
-            media_dolore_storico = df_storico["livello indolenzimento/dolore"].mean() if "livello indolenzimento/dolore" in df_storico.columns else 1.0
-            differenza_dolore = dolore_livello - media_dolore_storico
-            
-            predizione = media_semaforo_storico + (differenza_energia * 0.6) - (differenza_dolore * 0.4)
-            semaforo_reale_calcolato = round(max(1.0, min(10.0, predizione)), 1)
-            
-            st.session_state['semaforo_predetto'] = semaforo_reale_calcolato
-            
-            if semaforo_reale_calcolato >= 6.0:
-                st.success(f"🟢 Semaforo Energetico Rilevato: **{semaforo_reale_calcolato}** (Giornata Buona/Carica)")
-            elif semaforo_reale_calcolato >= 4.0:
-                st.warning(f"🟡 Semaforo Energetico Rilevato: **{semaforo_reale_calcolato}** (Giornata Media/Attenzione)")
-            else:
-                st.error(f"🔴 Semaforo Energetico Rilevato: **{semaforo_reale_calcolato}** (Giornata Scarica/Riposo)")
-        except Exception as e:
-            st.info("Calcolo statistico in corso... Usa il valore standard di riserva (5.0)")
-            st.session_state['semaforo_predetto'] = 5.0
+            for col in df_storico.columns:
+                if "Energia" in col or "risveq" in col:
+                    media_energia_storica = df_storico[col].mean()
+                if "semaforo" in col:
+                    media_semaforo_storico = df_storico[col].mean()
+                if "indolenzimento" in col or "dolore" in col:
+                    media_dolore_storico = df_storico[col].mean()
+        except:
+            pass
+
+    differenza_energia = energia - media_energia_storica
+    differenza_dolore = dolore_livello - media_dolore_storico
+    predizione = media_semaforo_storico + (differenza_energia * 0.6) - (differenza_dolore * 0.4)
+    semaforo_reale_calcolato = round(max(1.0, min(10.0, predizione)), 1)
+    
+    st.session_state['semaforo_predetto'] = semaforo_reale_calcolato
+    
+    if semaforo_reale_calcolato >= 6.0:
+        st.success(f"🟢 Semaforo Energetico Rilevato: **{semaforo_reale_calcolato}** (Giornata Buona/Carica)")
+    elif semaforo_reale_calcolato >= 4.0:
+        st.warning(f"🟡 Semaforo Energetico Rilevato: **{semaforo_reale_calcolato}** (Giornata Media/Attenzione)")
     else:
-        st.info("Database storico non ancora collegato in lettura. Uso valore standard di riserva (5.0)")
-        st.session_state['semaforo_predetto'] = 5.0
+        st.error(f"🔴 Semaforo Energetico Rilevato: **{semaforo_reale_calcolato}** (Giornata Scarica/Riposo)")
 
 valore_semaforo_da_salvare = st.session_state.get('semaforo_predetto', 5.0)
 
@@ -113,16 +114,16 @@ st.write("---")
 if st.button("💾 Registra Giornata nel Database", type="primary"):
     stringa_attivita = ", ".join(attivita_scelte)
     
+    # Payload pulito senza il campo data che creava il blocco
     payload = {
-        ENTRY_ID['data']: data_oggi.strftime("%Y-%m-%d"),
-        ENTRY_ID['temp']: temp_massima,
-        ENTRY_ID['sonno']: sonno_scelto,
-        ENTRY_ID['energia']: energia,
-        ENTRY_ID['passi']: passi_scelti,
-        ENTRY_ID['attivita']: stringa_attivita,
-        ENTRY_ID['dolore']: int(dolore_livello),
-        ENTRY_ID['semaforo']: voto_reale,
-        ENTRY_ID['posizione']: posizione_corrente
+        ENTRY_ID['temp']: str(temp_massima).replace('.', ','),
+        ENTRY_ID['sonno']: str(sonno_scelto),
+        ENTRY_ID['energia']: str(energia).replace('.', ','),
+        ENTRY_ID['passi']: str(passi_scelti),
+        ENTRY_ID['attivita']: str(stringa_attivita),
+        ENTRY_ID['dolore']: str(int(dolore_livello)),
+        ENTRY_ID['semaforo']: str(voto_reale).replace('.', ','),
+        ENTRY_ID['posizione']: str(posizione_corrente)
     }
     
     try:
