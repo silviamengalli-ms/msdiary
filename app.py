@@ -17,10 +17,33 @@ ENTRY_ID = {
     'semaforo': 'entry.625659299',
     'dolore': 'entry.672372933',
     'passi': 'entry.28384771',
-    'note': 'entry.158362423'  # <--- Nuovo ID per le Note
+    'note': 'entry.158362423'
 }
 
 URL_FOGLIO_CSV = "https://docs.google.com/spreadsheets/d/1eSnvfouOdaL-sakQgwKCItUEKXN-96ECF93KD96cx-E/export?format=csv&gid=0"
+
+# --- PARAMETRI DI CALIBRAZIONE ---
+PESI_SONNO = {
+    "discreta": 0.0, 
+    "soddisfacente": 1.0, 
+    "scarsa": -1.5
+}
+
+PESI_PASSI = {
+    "fino a 1000": 0.5,
+    "da 1001 a 3000": 0.0, 
+    "oltre 3000": -0.5
+}
+
+PESI_ATTIVITA = {
+    "ufficio": -0.5,           
+    "lavoro da casa": -0.1,    
+    "piccole commissioni": -0.4, 
+    "visita": -0.5,            
+    "fisioterapia": 0.2,       
+    "riposo totale": 0.5,      
+    "sociale": -0.7            
+}
 
 # --- FUNZIONI ---
 def recupera_meteo_automatico(data_target):
@@ -33,7 +56,7 @@ def recupera_meteo_automatico(data_target):
         return 20.0
 
 # --- INTERFACCIA ---
-st.title("📊 MS Diary&Predictor")
+st.title("📊 Il Mio Diario & Predittore")
 
 try:
     df_storico = pd.read_csv(URL_FOGLIO_CSV)
@@ -51,21 +74,30 @@ with col2:
     attivita = st.multiselect("Attività", ["ufficio", "lavoro da casa", "piccole commissioni", "visita", "fisioterapia", "riposo totale", "sociale"])
     dolore = st.slider("Dolore (1-10)", 1, 10, 1)
 
-# Campo Note
-note = st.text_area("📝 Note (opzionale - usa questo spazio per annotare discrepanze o sensazioni particolari):")
+note = st.text_area("📝 Note (opzionale):")
 
-# --- LOGICA AI E GRAFICA ---
+# --- LOGICA AI ---
 st.subheader("🔮 Stato del Semaforo")
 
 if st.button("🔄 Calcola Predizione AI"):
     media_en = df_storico['Energia'].mean() if 'Energia' in df_storico.columns else 5.0
     media_dol = df_storico['Dolore'].mean() if 'Dolore' in df_storico.columns else 1.0
-    predizione = 5.0 + ((energia - media_en) * 0.4) - ((dolore - media_dol) * 0.4)
-    st.session_state['semaforo_predetto'] = round(max(1.0, min(10.0, predizione)), 1)
+    
+    score = 5.0 + ((energia - media_en) * 0.4) - ((dolore - media_dol) * 0.4)
+    score += PESI_SONNO.get(sonno, 0)
+    score += PESI_PASSI.get(passi, 0)
+    score += sum([PESI_ATTIVITA.get(a, 0) for a in attivita])
+    
+    # Logica Temperatura Intelligente
+    if temp > 30 and "riposo totale" not in attivita:
+        score -= 1.0
+    elif temp > 30 and "riposo totale" in attivita:
+        score -= 0.2
+        
+    st.session_state['semaforo_predetto'] = round(max(1.0, min(10.0, score)), 1)
 
 valore = st.session_state.get('semaforo_predetto', 5.0)
 
-# Visualizzazione semaforo
 if valore <= 5:
     st.error(f"### Stato attuale: 🔴 ROSSO (Valore: {valore})")
 elif 6 <= valore <= 8:
@@ -85,7 +117,7 @@ if st.button("💾 Registra Giornata", type="primary"):
         ENTRY_ID['dolore']: str(dolore),
         ENTRY_ID['semaforo']: str(valore_da_registrare),
         ENTRY_ID['passi']: passi,
-        ENTRY_ID['note']: note # Invio delle note
+        ENTRY_ID['note']: note
     }
     
     payload_lista = list(payload.items())
