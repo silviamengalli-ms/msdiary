@@ -58,7 +58,8 @@ with col1:
     energia = st.slider("Energia al risveglio", 1.0, 10.0, 5.0, 0.5)
 
 with col2:
-    passi_scelti = st.selectbox("Passi", ["fino a 1000", "da 1001 a 3000", "oltre i 3000"])
+    # Allineato con il testo esatto del modulo ("1.000" e "3.000")
+    passi_scelti = st.selectbox("Passi", ["fino a 1.000", "da 1.001 a 3.000", "oltre i 3.000"])
     attivita_scelte = st.multiselect(
         "Attività", 
         ["sociale", "piccole commissioni", "lavoro da casa", "fisioterapia", "ufficio", "visita", "riposo totale"]
@@ -80,7 +81,7 @@ if st.button("🔄 Calcola Predizione AI", type="secondary"):
             for col in df_storico.columns:
                 if "Energia" in col or "risveq" in col: media_energia_storica = df_storico[col].mean()
                 if "semaforo" in col: media_semaforo_storico = df_storico[col].mean()
-                if "indolenzimento" in col or "dolore" in col: media_dolore_storica = df_storico[col].mean()
+                if "indolenzimento" in col or "dolore" in col: media_dolore_storico = df_storico[col].mean()
         except: pass
 
     differenza_energia = energia - media_energia_storica
@@ -104,15 +105,19 @@ st.write("---")
 if st.button("💾 Registra Giornata nel Database", type="primary"):
     stringa_attivita = ", ".join(attivita_scelte)
     
-    # Inviamo i dati come stringhe standard (proviamo con il punto decimale)
+    # TRASFORMAZIONE IN FORMATO ITALIANO (Punto -> Virgola)
+    temp_formattata = str(round(temp_massima, 1)).replace('.', ',')
+    energia_formattata = str(round(energia, 1)).replace('.', ',')
+    semaforo_formattato = str(round(voto_reale, 1)).replace('.', ',')
+    
     payload = {
-        ENTRY_ID['temp']: str(temp_massima),
+        ENTRY_ID['temp']: temp_formattata,
         ENTRY_ID['sonno']: str(sonno_scelto),
-        ENTRY_ID['energia']: str(energia),
+        ENTRY_ID['energia']: energia_formattata,
         ENTRY_ID['passi']: str(passi_scelti),
         ENTRY_ID['attivita']: str(stringa_attivita),
         ENTRY_ID['dolore']: str(int(dolore_livello)),
-        ENTRY_ID['semaforo']: str(voto_reale),
+        ENTRY_ID['semaforo']: semaforo_formattato,
         ENTRY_ID['posizione']: str(posizione_corrente)
     }
     
@@ -120,10 +125,9 @@ if st.button("💾 Registra Giornata nel Database", type="primary"):
         response = requests.post(URL_MODULO, data=payload)
         if response.status_code == 200:
             st.balloons()
-            st.success("✅ Dati registrati!")
+            st.success("✅ Dati registrati con successo nel database!")
         else:
-            # 🔎 STAMPA L'ERRORE REALE DI GOOGLE A SCHERMO
             st.error(f"❌ Errore {response.status_code}. Google ha rifiutato i dati.")
-            st.code(payload) # Ti mostra cosa stava provando a inviare
+            st.code(payload)
     except Exception as e:
         st.error(f"💥 Errore di connessione: {e}")
