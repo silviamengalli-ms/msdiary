@@ -55,17 +55,15 @@ col1, col2 = st.columns(2)
 with col1:
     posizione_corrente = st.text_input("📍 Ti trovi a:", value="Verona")
     temp_massima = st.number_input("Temperatura meteorologica massima (°C)", value=temp_automatica, step=0.5)
-    # Sistemate maiuscole identiche a Google Form
     sonno_scelto = st.selectbox("Qualità del sonno", ["discreta", "soddisfacente", "scarsa"])
-    energia = st.slider("Energia al risveglio", 1.0, 10.0, 5.0, 1.0)
+    energia = st.slider("Energia al risveglio", 1, 10, 5, 1)
 
 with col2:
-    # Sistemate maiuscole identiche a Google Form
     attivita_scelte = st.multiselect(
         "Attività", 
         ["ufficio", "lavoro da casa", "piccole commissioni", "visita", "fisioterapia", "riposo totale", "sociale"]
     )
-    dolore_livello = st.slider("Livello indolenzimento/dolore", 1.0, 10.0, 1.0, 1.0)
+    dolore_livello = st.slider("Livello indolenzimento/dolore", 1, 10, 1, 1)
 
 st.write("---")
 
@@ -102,32 +100,41 @@ if st.button("🔄 Calcola Predizione AI", type="secondary"):
 valore_semaforo_da_salvare = st.session_state.get('semaforo_predetto', 5.0)
 
 st.write("---")
-voto_reale = st.slider("Semaforo energetico finale da registrare", 1.0, 10.0, float(round(valore_semaforo_da_salvare)), 1.0)
+voto_reale = st.slider("Semaforo energetico finale da registrare", 1, 10, int(round(valore_semaforo_da_salvare)), 1)
 
 st.write("---")
 
 # --- PULSANTE REGISTRA ---
 if st.button("💾 Registra Giornata nel Database", type="primary"):
     
-    # Rimosso il campo data_comp per lasciare che Google usi il suo timestamp nativo ed evitare il crash del formato
-    payload_lista = [
-        (ENTRY_ID['posizione'], posizione_corrente),
-        (ENTRY_ID['temp'], str(round(temp_massima, 1)).replace('.', ',')),
-        (ENTRY_ID['sonno'], sonno_scelto),
-        (ENTRY_ID['energia'], str(int(energia))),
-        (ENTRY_ID['dolore'], str(int(dolore_livello))),
-        (ENTRY_ID['semaforo'], str(int(voto_reale)))
-    ]
+    # Prepariamo i dati convertendo tutto in testo pulito
+    # Per la temperatura passiamo un numero intero convertito in stringa per evitare i conflitti di virgole/punti
+    payload = {
+        ENTRY_ID['posizione']: str(posizione_corrente),
+        ENTRY_ID['temp']: str(int(round(temp_massima))),
+        ENTRY_ID['sonno']: str(sonno_scelto),
+        ENTRY_ID['energia']: str(int(energia)),
+        ENTRY_ID['dolore']: str(int(dolore_livello)),
+        ENTRY_ID['semaforo']: str(int(voto_reale))
+    }
+    
+    # Gestione dizionario/lista per le risposte multiple
+    payload_lista = list(payload.items())
     
     if attivita_scelte:
         for att in attivita_scelte:
-            payload_lista.append((ENTRY_ID['attivita'], att))
-        
+            payload_lista.append((ENTRY_ID['attivita'], str(att)))
+            
     try:
-        response = requests.post(URL_MODULO, data=payload_lista)
+        # Usiamo una sessione standard per emulare un browser reale ed evitare rifiuti
+        session = requests.Session()
+        response = session.post(URL_MODULO, data=payload_lista)
+        
         if response.status_code == 200:
             st.success("🎉 Giornata registrata con successo nel database!")
         else:
             st.error(f"❌ Errore del server Google: {response.status_code}")
+            # Mostra cosa stiamo inviando per fare debug visivo in caso di errore
+            st.write("Dati inviati per controllo:", payload_lista)
     except Exception as e:
         st.error(f"💥 Errore di connessione: {e}")
