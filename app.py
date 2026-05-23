@@ -15,7 +15,8 @@ ENTRY_ID = {
     'energia': 'entry.1596414247',
     'attivita': 'entry.1595201387',
     'semaforo': 'entry.625659299',
-    'dolore': 'entry.672372933'
+    'dolore': 'entry.672372933',
+    'passi': 'entry.1805134602'
 }
 
 # --- CARICAMENTO DATI PER AI ---
@@ -59,6 +60,7 @@ with col1:
     energia = st.slider("Energia al risveglio", 1, 10, 5, 1)
 
 with col2:
+    passi_scelti = st.selectbox("Passi", ["fino a 1000", "da 1000 a 2500", "oltre 2500"])
     attivita_scelte = st.multiselect(
         "Attività", 
         ["ufficio", "lavoro da casa", "piccole commissioni", "visita", "fisioterapia", "riposo totale", "sociale"]
@@ -100,25 +102,23 @@ if st.button("🔄 Calcola Predizione AI", type="secondary"):
 valore_semaforo_da_salvare = st.session_state.get('semaforo_predetto', 5.0)
 
 st.write("---")
-voto_reale = st.slider("Semaforo energetico finale da registrare", 1, 10, int(round(valore_semaforo_da_salvare)), 1)
+voto_reale = st.slider("Semaforo energetico finale da registrare", 1, 10, int(round(valore_semaforo_da_salvale)), 1)
 
 st.write("---")
 
 # --- PULSANTE REGISTRA ---
 if st.button("💾 Registra Giornata nel Database", type="primary"):
     
-    # Prepariamo i dati convertendo tutto in testo pulito
-    # Per la temperatura passiamo un numero intero convertito in stringa per evitare i conflitti di virgole/punti
     payload = {
         ENTRY_ID['posizione']: str(posizione_corrente),
         ENTRY_ID['temp']: str(int(round(temp_massima))),
         ENTRY_ID['sonno']: str(sonno_scelto),
         ENTRY_ID['energia']: str(int(energia)),
         ENTRY_ID['dolore']: str(int(dolore_livello)),
-        ENTRY_ID['semaforo']: str(int(voto_reale))
+        ENTRY_ID['semaforo']: str(int(voto_reale)),
+        ENTRY_ID['passi']: str(passi_scelti)
     }
     
-    # Gestione dizionario/lista per le risposte multiple
     payload_lista = list(payload.items())
     
     if attivita_scelte:
@@ -126,15 +126,12 @@ if st.button("💾 Registra Giornata nel Database", type="primary"):
             payload_lista.append((ENTRY_ID['attivita'], str(att)))
             
     try:
-        # Usiamo una sessione standard per emulare un browser reale ed evitare rifiuti
         session = requests.Session()
         response = session.post(URL_MODULO, data=payload_lista)
         
         if response.status_code == 200:
-            st.success("🎉 Giornata registrata con successo nel database!")
+            st.success("🎉 Giornata registrata con successo (inclusi i passi)!")
         else:
             st.error(f"❌ Errore del server Google: {response.status_code}")
-            # Mostra cosa stiamo inviando per fare debug visivo in caso di errore
-            st.write("Dati inviati per controllo:", payload_lista)
     except Exception as e:
         st.error(f"💥 Errore di connessione: {e}")
