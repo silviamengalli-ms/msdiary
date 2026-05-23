@@ -54,15 +54,14 @@ col1, col2 = st.columns(2)
 with col1:
     posizione_corrente = st.text_input("📍 Ti trovi a:", value="Verona")
     temp_massima = st.number_input("Temperatura meteorologica massima (°C)", value=temp_automatica, step=0.5)
-    sonno_scelto = st.selectbox("Qualità del sonno", ["soddisfacente", "discreta", "scarsa"])
+    sonno_scelto = st.selectbox("Qualità del sonno", ["Soddisfacente", "Discreta", "Scarsa"])
     energia = st.slider("Energia al risveglio", 1.0, 10.0, 5.0, 0.5)
 
 with col2:
-    # Allineato con il testo esatto del modulo ("1.000" e "3.000")
-    passi_scelti = st.selectbox("Passi", ["fino a 1.000", "da 1.001 a 3.000", "oltre i 3.000"])
+    passi_scelti = st.selectbox("Passi", ["Fino a 1.000", "Da 1.001 a 3.000", "Oltre i 3.000"])
     attivita_scelte = st.multiselect(
         "Attività", 
-        ["sociale", "piccole commissioni", "lavoro da casa", "fisioterapia", "ufficio", "visita", "riposo totale"]
+        ["Sociale", "Piccole commissioni", "Lavoro da casa", "Fisioterapia", "Ufficio", "Visita", "Riposo totale"]
     )
     dolore_livello = st.slider("Livello indolenzimento/dolore", 1.0, 10.0, 1.0, 0.5)
 
@@ -103,26 +102,26 @@ st.write("---")
 
 # --- PULSANTE REGISTRA ---
 if st.button("💾 Registra Giornata nel Database", type="primary"):
-    stringa_attivita = ", ".join(attivita_scelte)
     
-    # TRASFORMAZIONE IN FORMATO ITALIANO (Punto -> Virgola)
-    temp_formattata = str(round(temp_massima, 1)).replace('.', ',')
-    energia_formattata = str(round(energia, 1)).replace('.', ',')
-    semaforo_formattato = str(round(voto_reale, 1)).replace('.', ',')
-    
+    # Invia i dati numerici come NUMERI VERI (float e int), non come stringhe testuali.
+    # Questo permette di superare i controlli di convalida impostati sul modulo Google.
     payload = {
-        ENTRY_ID['temp']: temp_formattata,
-        ENTRY_ID['sonno']: str(sonno_scelto),
-        ENTRY_ID['energia']: energia_formattata,
-        ENTRY_ID['passi']: str(passi_scelti),
-        ENTRY_ID['attivita']: str(stringa_attivita),
-        ENTRY_ID['dolore']: str(int(dolore_livello)),
-        ENTRY_ID['semaforo']: semaforo_formattato,
-        ENTRY_ID['posizione']: str(posizione_corrente)
+        ENTRY_ID['temp']: round(temp_massima, 1),
+        ENTRY_ID['sonno']: sonno_scelto,
+        ENTRY_ID['energia']: round(energia, 1),
+        ENTRY_ID['passi']: passi_scelti,
+        ENTRY_ID['dolore']: int(dolore_livello),
+        ENTRY_ID['semaforo']: round(voto_reale, 1),
+        ENTRY_ID['posizione']: posizione_corrente
     }
     
+    # Costruiamo la lista finale includendo le attività multiple
+    lista_payload = [(chiave, valore) for chiave, valore in payload.items()]
+    for att in attivita_scelte:
+        lista_payload.append((ENTRY_ID['attivita'], att))
+    
     try:
-        response = requests.post(URL_MODULO, data=payload)
+        response = requests.post(URL_MODULO, data=lista_payload)
         if response.status_code == 200:
             st.balloons()
             st.success("✅ Dati registrati con successo nel database!")
