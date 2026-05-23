@@ -39,7 +39,6 @@ st.title("📊 Il Mio Diario della Giornata")
 @st.cache_data(ttl=5)
 def carica_dati(url):
     try: 
-        # Leggiamo il foglio ignorando eventuali righe vuote
         return pd.read_csv(url).dropna(subset=["Data", "semaforo energetico"])
     except: 
         return None
@@ -71,35 +70,67 @@ with col2:
 
 st.write("---")
 
-# --- SEZIONE PREDIZIONE AI (IL SEMAFORO CALCOLATO) ---
+# --- SEZIONE PREDIZIONE AI ---
 st.subheader("🔮 Calcolo del Semaforo Energetico")
 
 if st.button("🔄 Calcola Predizione AI", type="secondary"):
     if df_storico is not None and not df_storico.empty:
         try:
-            # 🧠 ALGORITMO DI PREDIZIONE BASATO SUL TUO STORICO REALISTICO
-            # Calcoliamo l'impatto medio dei tuoi fattori storici sul semaforo energetico
             media_energia_storica = df_storico["Energia al risvegl"].mean() if "Energia al risvegl" in df_storico.columns else 5.0
             media_semaforo_storico = df_storico["semaforo energetico"].mean()
             
-            # Calcoliamo una deviazione basata sull'energia di oggi rispetto alla tua media
             differenza_energia = energia - media_energia_storica
             
-            # Correzione basata sul dolore di oggi (più dolore abbassa il semaforo)
             media_dolore_storico = df_storico["livello indolenzimento/dolore"].mean() if "livello indolenzimento/dolore" in df_storico.columns else 1.0
             differenza_dolore = dolore_livello - media_dolore_storico
             
-            # Calcolo finale pesato
             predizione = media_semaforo_storico + (differenza_energia * 0.6) - (differenza_dolore * 0.4)
             semaforo_reale_calcolato = round(max(1.0, min(10.0, predizione)), 1)
             
-            # Salviamo il valore temporaneamente nella memoria dell'app
             st.session_state['semaforo_predetto'] = semaforo_reale_calcolato
             
-            # Mostriamo il risultato con un colore dinamico
             if semaforo_reale_calcolato >= 6.0:
                 st.success(f"🟢 Semaforo Energetico Rilevato: **{semaforo_reale_calcolato}** (Giornata Buona/Carica)")
             elif semaforo_reale_calcolato >= 4.0:
                 st.warning(f"🟡 Semaforo Energetico Rilevato: **{semaforo_reale_calcolato}** (Giornata Media/Attenzione)")
             else:
-                st.error(f"🔴 Semaforo Energetico Rilevato: **{semaforo_reale_calcolato}
+                st.error(f"🔴 Semaforo Energetico Rilevato: **{semaforo_reale_calcolato}** (Giornata Scarica/Riposo)")
+        except Exception as e:
+            st.info("Calcolo statistico in corso... Usa il valore standard di riserva (5.0)")
+            st.session_state['semaforo_predetto'] = 5.0
+    else:
+        st.info("Database storico non ancora collegato in lettura. Uso valore standard di riserva (5.0)")
+        st.session_state['semaforo_predetto'] = 5.0
+
+valore_semaforo_da_salvare = st.session_state.get('semaforo_predetto', 5.0)
+
+st.write("---")
+voto_reale = st.slider("Semaforo energetico finale da registrare", 1.0, 10.0, float(valore_semaforo_da_salvare), 0.5)
+
+st.write("---")
+
+# --- PULSANTE REGISTRA ---
+if st.button("💾 Registra Giornata nel Database", type="primary"):
+    stringa_attivita = ", ".join(attivita_scelte)
+    
+    payload = {
+        ENTRY_ID['data']: data_oggi.strftime("%Y-%m-%d"),
+        ENTRY_ID['temp']: temp_massima,
+        ENTRY_ID['sonno']: sonno_scelto,
+        ENTRY_ID['energia']: energia,
+        ENTRY_ID['passi']: passi_scelti,
+        ENTRY_ID['attivita']: stringa_attivita,
+        ENTRY_ID['dolore']: int(dolore_livello),
+        ENTRY_ID['semaforo']: voto_reale,
+        ENTRY_ID['posizione']: posizione_corrente
+    }
+    
+    try:
+        response = requests.post(URL_MODULO, data=payload)
+        if response.status_code == 200:
+            st.balloons()
+            st.success("✅ Dati inviati al Modulo e registrati sul Foglio Google!")
+        else:
+            st.error("❌ Errore nell'invio. Verifica la connessione dell'app.")
+    except:
+        st.error("❌ Errore di connessione con il server di Google.")
