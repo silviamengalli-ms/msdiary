@@ -93,4 +93,29 @@ elif 6 <= valore <= 8:
 else:
     st.success(f"Stato attuale: VERDE (Valore: {valore})")
 
-valore_da_registrare = st.slider("Conferma o modifica valore finale:", 1, 10, int(
+valore_da_registrare = st.slider("Conferma o modifica valore finale:", 1, 10, int(valore))
+
+# --- INVIO DATI ---
+if st.button("💾 Registra Giornata", type="primary"):
+    payload = {
+        ENTRY_ID['posizione']: posizione,
+        ENTRY_ID['temp']: str(int(temp)),
+        ENTRY_ID['sonno']: sonno,
+        ENTRY_ID['energia']: str(energia),
+        ENTRY_ID['dolore']: str(dolore), 
+        ENTRY_ID['semaforo']: str(valore_da_registrare),
+        ENTRY_ID['passi']: passi,
+        ENTRY_ID['note']: note
+    }
+    payload_lista = list(payload.items())
+    for a in attivita:
+        payload_lista.append((ENTRY_ID['attivita'], a))
+    
+    try:
+        response = requests.post(URL_MODULO, data=payload_lista)
+        if response.status_code == 200:
+            st.success("🎉 Registrazione riuscita!")
+        else:
+            st.error(f"Errore di invio: {response.status_code}")
+    except Exception as e:
+        st.error(f"Errore di connessione: {e}")
