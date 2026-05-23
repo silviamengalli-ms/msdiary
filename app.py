@@ -33,7 +33,7 @@ def recupera_meteo_automatico(data_target):
         return 20.0
 
 # --- INTERFACCIA ---
-st.title("📊 Il Mio Diario & Predittore")
+st.title("📊 MS Diary&Predictor")
 
 try:
     df_storico = pd.read_csv(URL_FOGLIO_CSV)
