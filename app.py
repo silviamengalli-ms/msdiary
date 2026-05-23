@@ -43,13 +43,12 @@ with col1:
     energia = st.slider("Energia", 1, 10, 5)
 
 with col2:
-    # ATTENZIONE: le opzioni qui devono essere IDENTICHE a quelle del form
-    passi_scelti = st.selectbox("Passi", ["fino a 1000", "da 1000 a 2500", "oltre 2500"])
+    # Etichette aggiornate identiche al modulo
+    passi_scelti = st.selectbox("Passi", ["fino a 1000", "da 1001 a 3000", "oltre 3000"])
     attivita_scelte = st.multiselect("Attività", ["ufficio", "lavoro da casa", "piccole commissioni", "visita", "fisioterapia", "riposo totale", "sociale"])
     dolore_livello = st.slider("Dolore", 1, 10, 1)
 
 st.write("---")
-# Calcolo semplificato per brevità
 valore_semaforo = st.slider("Semaforo finale", 1, 10, 5)
 
 # --- PULSANTE REGISTRA ---
@@ -65,19 +64,4 @@ if st.button("💾 Registra Giornata nel Database", type="primary"):
         ENTRY_ID['passi']: str(passi_scelti) 
     }
     
-    payload_lista = list(payload.items())
-    
-    for att in attivita_scelte:
-        payload_lista.append((ENTRY_ID['attivita'], str(att)))
-            
-    # DEBUG Visivo
-    st.write("Dati inviati:", payload_lista)
-            
-    try:
-        response = requests.post(URL_MODULO, data=payload_lista)
-        if response.status_code == 200:
-            st.success("🎉 Registrato!")
-        else:
-            st.error(f"Errore: {response.status_code}")
-    except Exception as e:
-        st.error(f"Errore: {e}")
+    payload_lista = list(
