@@ -73,10 +73,15 @@ if st.button("💾 Registra Giornata", type="primary"):
         ENTRY_ID['passi']: passi
     }
     
-    # Lista di tuple per gestire le selezioni multiple (attività)
     payload_lista = list(payload.items())
     for a in attivita:
         payload_lista.append((ENTRY_ID['attivita'], a))
     
     try:
-        response =
+        response = requests.post(URL_MODULO, data=payload_lista)
+        if response.status_code == 200:
+            st.success("🎉 Registrazione riuscita!")
+        else:
+            st.error(f"Errore di invio: {response.status_code}")
+    except Exception as e:
+        st.error(f"Errore di connessione: {e}")
