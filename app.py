@@ -5,18 +5,18 @@ import requests
 
 st.set_page_config(page_title="MS Diary - Predizione", page_icon="📊", layout="centered")
 
-# --- CONFIGURAZIONE GOOGLE MODULI ---
-URL_MODULO = "https://docs.google.com/forms/d/e/1FAIpQLSfsNrtCcCMKrQ22pM-7NfrW7F9xWvtUSZPNBu83AgV9ZyWtDQ/formResponse"
+# --- CONFIGURAZIONE GOOGLE MODULI (AGGIORNATA AL NUOVO FORM) ---
+URL_MODULO = "https://docs.google.com/forms/d/e/1FAIpQLSclLdf0eA6rO_gJAtCAsgDco_wU60b0q-O2Zcl5D88Zk-fAnQ/formResponse"
 
 ENTRY_ID = {
-    'temp': 'entry.170668988',
-    'sonno': 'entry.1643446045',
-    'energia': 'entry.1042761612',
-    'passi': 'entry.111812166',
-    'attivita': 'entry.1729676735',
-    'dolore': 'entry.533285942',
-    'semaforo': 'entry.317549883',
-    'posizione': 'entry.507425624'
+    'temp': 'entry.232332158',
+    'sonno': 'entry.1764614275',
+    'energia': 'entry.1165485458',
+    'passi': 'entry.571477759',
+    'attivita': 'entry.1492025171',
+    'dolore': 'entry.460775323',
+    'semaforo': 'entry.44490089',
+    'posizione': 'entry.492160682'
 }
 
 # --- CARICAMENTO DATI PER AI ---
@@ -114,24 +114,6 @@ st.write("---")
 if st.button("💾 Registra Giornata nel Database", type="primary"):
     stringa_attivita = ", ".join(attivita_scelte)
     
-    # Payload pulito senza il campo data che creava il blocco
+    # Payload mappato sui NUOVI codici esatti del modulo corrente
     payload = {
         ENTRY_ID['temp']: str(temp_massima).replace('.', ','),
-        ENTRY_ID['sonno']: str(sonno_scelto),
-        ENTRY_ID['energia']: str(energia).replace('.', ','),
-        ENTRY_ID['passi']: str(passi_scelti),
-        ENTRY_ID['attivita']: str(stringa_attivita),
-        ENTRY_ID['dolore']: str(int(dolore_livello)),
-        ENTRY_ID['semaforo']: str(voto_reale).replace('.', ','),
-        ENTRY_ID['posizione']: str(posizione_corrente)
-    }
-    
-    try:
-        response = requests.post(URL_MODULO, data=payload)
-        if response.status_code == 200:
-            st.balloons()
-            st.success("✅ Dati inviati al Modulo e registrati sul Foglio Google!")
-        else:
-            st.error("❌ Errore nell'invio. Verifica la connessione dell'app.")
-    except:
-        st.error("❌ Errore di connessione con il server di Google.")
