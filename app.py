@@ -51,15 +51,28 @@ with col2:
     dolore = st.slider("Dolore (1-10)", 1, 10, 1)
 
 # --- LOGICA AI ---
-st.subheader("🔮 Calcolo del Semaforo")
+st.subheader("🔮 Stato del Semaforo")
+
 if st.button("🔄 Calcola Predizione AI"):
     media_en = df_storico['Energia'].mean() if 'Energia' in df_storico.columns else 5.0
     media_dol = df_storico['Dolore'].mean() if 'Dolore' in df_storico.columns else 1.0
     predizione = 5.0 + ((energia - media_en) * 0.6) - ((dolore - media_dol) * 0.4)
     st.session_state['semaforo_predetto'] = round(max(1.0, min(10.0, predizione)), 1)
 
-st.write(f"### Semaforo predetto: **{st.session_state.get('semaforo_predetto', 5.0)}**")
-valore_da_registrare = st.slider("Semaforo finale da salvare", 1, 10, int(st.session_state.get('semaforo_predetto', 5.0)))
+valore = st.session_state.get('semaforo_predetto', 5.0)
+
+# Grafica del semaforo
+if valore <= 5:
+    colore = "🔴 ROSSO"
+    st.error(f"### Stato attuale: {colore} (Valore: {valore})")
+elif 6 <= valore <= 8:
+    colore = "🟡 GIALLO"
+    st.warning(f"### Stato attuale: {colore} (Valore: {valore})")
+else:
+    colore = "🟢 VERDE"
+    st.success(f"### Stato attuale: {colore} (Valore: {valore})")
+
+valore_da_registrare = st.slider("Conferma o modifica valore finale:", 1, 10, int(valore))
 
 # --- INVIO DATI ---
 if st.button("💾 Registra Giornata", type="primary"):
