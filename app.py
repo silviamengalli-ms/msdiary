@@ -5,10 +5,9 @@ import requests
 
 st.set_page_config(page_title="MS Diary - Predizione", page_icon="📊", layout="centered")
 
-# --- CONFIGURAZIONE GOOGLE MODULI (LINK ORIGINALE CORRETTO) ---
+# --- CONFIGURAZIONE GOOGLE MODULI (ID AGGIORNATI DA CODICE SORGENTE) ---
 URL_MODULO = "https://docs.google.com/forms/d/e/1FAIpQLSfsNrtCcCMKrQ22pM-7NfrW7F9xWvtUSZPNBu83AgV9ZyWtDQ/formResponse"
 
-# ID Domande specifici per questo modulo
 ENTRY_ID = {
     'temp': 'entry.170668988',
     'sonno': 'entry.1643446045',
@@ -45,7 +44,7 @@ def carica_dati(url):
 
 df_storico = carica_dati(URL_FOGLIO_CSV)
 
-# --- INTERFACCIA UTENTE REALE ---
+# --- INTERFACCIA UTENTE ---
 st.subheader("🗓️ Inserisci i dati di oggi")
 data_oggi = st.date_input("Data di riferimento per il meteo", datetime.date.today())
 
@@ -103,36 +102,40 @@ if st.button("🔄 Calcola Predizione AI", type="secondary"):
 valore_semaforo_da_salvare = st.session_state.get('semaforo_predetto', 5.0)
 
 st.write("---")
-voto_reale = st.slider("Semaforo energetico finale da registrare", 1.0, 10.0, float(valore_semaforo_da_salvare), 0.5)
+# Nota: arrotondiamo a intero (es. int) per la massima compatibilità con la scala lineare di Google
+voto_reale = st.slider("Semaforo energetico finale da registrare", 1.0, 10.0, float(round(valore_semaforo_da_salvare)), 1.0)
 
 st.write("---")
 
 # --- PULSANTE REGISTRA ---
 if st.button("💾 Registra Giornata nel Database", type="primary"):
     
+    # Costruiamo il payload combinato
+    payload_lista = [
+        (ENTRY_ID['temp'], str(round(temp_massima, 1)).replace('.', ',')),
+        (ENTRY_ID['sonno'], sonno_scelto),
+        (ENTRY_ID['energia'], str(round(energia, 1)).replace('.', ',')),
+        (ENTRY_ID['passi'], passi_scelti),
+        (ENTRY_ID['dolore'], str(int(dolore_livello))),
+        (ENTRY_ID['semaforo'], str(int(voto_reale))),
+        (ENTRY_ID['posizione'], posizione_corrente)
+    ]
+    
+    # Spacchettamento delle checkbox per le attività multiple
     if attivita_scelte:
-        stringa_attivita = ", ".join(attivita_scelte)
+        for att in attivita_scelte:
+            payload_lista.append((ENTRY_ID['attivita'], att))
     else:
-        stringa_attivita = "Riposo totale"
-
-    payload = {
-        ENTRY_ID['temp']: str(round(temp_massima, 1)).replace('.', ','),
-        ENTRY_ID['sonno']: str(sonno_scelto),
-        ENTRY_ID['energia']: str(round(energia, 1)).replace('.', ','),
-        ENTRY_ID['passi']: str(passi_scelti),
-        ENTRY_ID['attivita']: str(stringa_attivita),
-        ENTRY_ID['dolore']: str(int(dolore_livello)),
-        ENTRY_ID['semaforo']: str(round(voto_reale, 1)).replace('.', ','),
-        ENTRY_ID['posizione']: str(posizione_corrente)
-    }
+        payload_lista.append((ENTRY_ID['attivita'], "Riposo totale"))
     
     try:
-        response = requests.post(URL_MODULO, data=payload)
+        response = requests.post(URL_MODULO, data=payload_lista)
         if response.status_code == 200:
             st.balloons()
-            st.success("✅ Dati registrati con successo nel database!")
+            st.success("✅ Fantastico! Dati registrati correttamente nel Foglio Google!")
         else:
-            st.error(f"❌ Errore {response.status_code}. Google ha dovuto rifiutare i dati.")
-            st.code(payload)
+            st.error(f"❌ Errore {response.status_code}. Google ha rifiutato l'inserimento dei dati.")
+            st.write("Dati inviati per diagnostica:")
+            st.code(payload_lista)
     except Exception as e:
-        st.error(f"💥 Errore di connessione: {e}")
+        st.error(f"💥 Errore di rete: {e}")
