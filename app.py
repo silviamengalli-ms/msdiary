@@ -98,4 +98,39 @@ if st.button("🔄 Calcola Predizione AI", type="secondary"):
     
     if semaforo_reale_calcolato >= 6.0:
         st.success(f"🟢 Semaforo Energetico Rilevato: **{semaforo_reale_calcolato}** (Giornata Buona/Carica)")
-    elif semaforo_
+    elif semaforo_reale_calcolato >= 4.0:
+        st.warning(f"🟡 Semaforo Energetico Rilevato: **{semaforo_reale_calcolato}** (Giornata Media/Attenzione)")
+    else:
+        st.error(f"🔴 Semaforo Energetico Rilevato: **{semaforo_reale_calcolato}** (Giornata Scarica/Riposo)")
+
+valore_semaforo_da_salvare = st.session_state.get('semaforo_predetto', 5.0)
+
+st.write("---")
+voto_reale = st.slider("Semaforo energetico finale da registrare", 1.0, 10.0, float(valore_semaforo_da_salvare), 0.5)
+
+st.write("---")
+
+# --- PULSANTE REGISTRA ---
+if st.button("💾 Registra Giornata nel Database", type="primary"):
+    stringa_attivita = ", ".join(attivita_scelte)
+    
+    payload = {
+        ENTRY_ID['temp']: str(temp_massima).replace('.', ','),
+        ENTRY_ID['sonno']: str(sonno_scelto),
+        ENTRY_ID['energia']: str(energia).replace('.', ','),
+        ENTRY_ID['passi']: str(passi_scelti),
+        ENTRY_ID['attivita']: str(stringa_attivita),
+        ENTRY_ID['dolore']: str(int(dolore_livello)),
+        ENTRY_ID['semaforo']: str(voto_reale).replace('.', ','),
+        ENTRY_ID['posizione']: str(posizione_corrente)
+    }
+    
+    try:
+        response = requests.post(URL_MODULO, data=payload)
+        if response.status_code == 200:
+            st.balloons()
+            st.success("✅ Dati inviati al Modulo e registrati sul Foglio Google!")
+        else:
+            st.error("❌ Errore nell'invio. Verifica la connessione dell'app.")
+    except:
+        st.error("❌ Errore di connessione con il server di Google.")
