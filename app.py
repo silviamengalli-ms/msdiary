@@ -102,7 +102,8 @@ if st.button("🔄 Calcola Predizione AI", type="secondary"):
 valore_semaforo_da_salvare = st.session_state.get('semaforo_predetto', 5.0)
 
 st.write("---")
-voto_reale = st.slider("Semaforo energetico finale da registrare", 1, 10, int(round(valore_semaforo_da_salvale)), 1)
+# CORREZIONE: rinominato "da_salvale" in "da_salvare"
+voto_reale = st.slider("Semaforo energetico finale da registrare", 1, 10, int(round(valore_semaforo_da_salvare)), 1)
 
 st.write("---")
 
