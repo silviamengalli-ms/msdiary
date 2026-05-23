@@ -23,11 +23,10 @@ ENTRY_ID = {
 # --- CARICAMENTO DATI PER AI ---
 URL_FOGLIO_CSV = "https://docs.google.com/spreadsheets/d/1eSnvfouOdaL-sakQgwKCItUEKXN-96ECF93KD96cx-E/export?format=csv&gid=0"
 
-# --- FUNZIONE METEO AUTOMATICA (FISSATA SU VERONA) ---
+# --- FUNZIONE METEO AUTOMATICA (VERONA) ---
 def recupera_meteo_automatico(data_target):
     try:
         data_str = data_target.strftime("%Y-%m-%d")
-        # Coordinate fisse di Verona per evitare errori di geolocalizzazione internet
         url_meteo = f"https://api.open-meteo.com/v1/forecast?latitude=45.43&longitude=10.99&start_date={data_str}&end_date={data_str}&daily=temperature_2m_max&timezone=Europe/Rome"
         risposta = requests.get(url_meteo).json()
         temp_max = risposta['daily']['temperature_2m_max'][0]
@@ -39,8 +38,11 @@ st.title("📊 Il Mio Diario della Giornata")
 
 @st.cache_data(ttl=5)
 def carica_dati(url):
-    try: return pd.read_csv(url)
-    except: return None
+    try: 
+        # Leggiamo il foglio ignorando eventuali righe vuote
+        return pd.read_csv(url).dropna(subset=["Data", "semaforo energetico"])
+    except: 
+        return None
 
 df_storico = carica_dati(URL_FOGLIO_CSV)
 
@@ -48,14 +50,12 @@ df_storico = carica_dati(URL_FOGLIO_CSV)
 st.subheader("🗓️ Inserisci i dati di oggi")
 data_oggi = st.date_input("Data", datetime.date.today())
 
-# Il meteo ora punta sempre a Verona di default
 temp_automatica = recupera_meteo_automatico(data_oggi)
 
 st.write("---")
 col1, col2 = st.columns(2)
 
 with col1:
-    # 📍 Campo posizione messo in cima alla colonna di sinistra, fisso su Verona
     posizione_corrente = st.text_input("📍 Ti trovi a:", value="Verona")
     temp_massima = st.number_input("Temperatura meteorologica massima (°C)", value=temp_automatica, step=0.5)
     sonno_scelto = st.selectbox("Qualità del sonno", ["soddisfacente", "discreta", "scarsa"])
@@ -70,37 +70,36 @@ with col2:
     dolore_livello = st.slider("Livello indolenzimento/dolore", 1.0, 10.0, 1.0, 0.5)
 
 st.write("---")
-voto_reale = st.slider("Semaforo energetico", 1.0, 10.0, 5.0, 0.5)
 
-st.write("---")
+# --- SEZIONE PREDIZIONE AI (IL SEMAFORO CALCOLATO) ---
+st.subheader("🔮 Calcolo del Semaforo Energetico")
 
-# --- PULSANTE REGISTRA ---
-if st.button("💾 Registra Giornata nel Database", type="primary"):
-    stringa_attivita = ", ".join(attivita_scelte)
-    
-    payload = {
-        ENTRY_ID['data']: data_oggi.strftime("%Y-%m-%d"),
-        ENTRY_ID['temp']: temp_massima,
-        ENTRY_ID['sonno']: sonno_scelto,
-        ENTRY_ID['energia']: energia,
-        ENTRY_ID['passi']: passi_scelti,
-        ENTRY_ID['attivita']: stringa_attivita,
-        ENTRY_ID['dolore']: int(dolore_livello),
-        ENTRY_ID['semaforo']: voto_reale,
-        ENTRY_ID['posizione']: posizione_corrente
-    }
-    
-    try:
-        response = requests.post(URL_MODULO, data=payload)
-        if response.status_code == 200:
-            st.balloons()
-            st.success("✅ Dati inviati al Modulo e registrati sul Foglio Google!")
-        else:
-            st.error("❌ Errore nell'invio. Verifica la connessione dell'app.")
-    except:
-        st.error("❌ Errore di connessione con il server di Google.")
-
-# --- SEZIONE PREDIZIONE AI ---
-if st.button("🔮 Calcola Predizione AI"):
-    st.info("Funzione AI attiva. Calcolo in corso basato sullo storico attuale...")
-    
+if st.button("🔄 Calcola Predizione AI", type="secondary"):
+    if df_storico is not None and not df_storico.empty:
+        try:
+            # 🧠 ALGORITMO DI PREDIZIONE BASATO SUL TUO STORICO REALISTICO
+            # Calcoliamo l'impatto medio dei tuoi fattori storici sul semaforo energetico
+            media_energia_storica = df_storico["Energia al risvegl"].mean() if "Energia al risvegl" in df_storico.columns else 5.0
+            media_semaforo_storico = df_storico["semaforo energetico"].mean()
+            
+            # Calcoliamo una deviazione basata sull'energia di oggi rispetto alla tua media
+            differenza_energia = energia - media_energia_storica
+            
+            # Correzione basata sul dolore di oggi (più dolore abbassa il semaforo)
+            media_dolore_storico = df_storico["livello indolenzimento/dolore"].mean() if "livello indolenzimento/dolore" in df_storico.columns else 1.0
+            differenza_dolore = dolore_livello - media_dolore_storico
+            
+            # Calcolo finale pesato
+            predizione = media_semaforo_storico + (differenza_energia * 0.6) - (differenza_dolore * 0.4)
+            semaforo_reale_calcolato = round(max(1.0, min(10.0, predizione)), 1)
+            
+            # Salviamo il valore temporaneamente nella memoria dell'app
+            st.session_state['semaforo_predetto'] = semaforo_reale_calcolato
+            
+            # Mostriamo il risultato con un colore dinamico
+            if semaforo_reale_calcolato >= 6.0:
+                st.success(f"🟢 Semaforo Energetico Rilevato: **{semaforo_reale_calcolato}** (Giornata Buona/Carica)")
+            elif semaforo_reale_calcolato >= 4.0:
+                st.warning(f"🟡 Semaforo Energetico Rilevato: **{semaforo_reale_calcolato}** (Giornata Media/Attenzione)")
+            else:
+                st.error(f"🔴 Semaforo Energetico Rilevato: **{semaforo_reale_calcolato}
