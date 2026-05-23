@@ -5,11 +5,10 @@ import requests
 
 st.set_page_config(page_title="MS Diary - Predizione", page_icon="📊", layout="centered")
 
-# --- CONFIGURAZIONE GOOGLE MODULI (ID AGGIORNATI DA SORGENTE) ---
+# --- CONFIGURAZIONE GOOGLE MODULI ---
 URL_MODULO = "https://docs.google.com/forms/d/e/1FAIpQLSfsNrtCcCMKrQ22pM-7NfrW7F9xWvtUSZPNBu83AgV9ZyWtDQ/formResponse"
 
 ENTRY_ID = {
-    'data_comp': 'entry.2022449610',
     'posizione': 'entry.1412086707',
     'temp': 'entry.1900939990',
     'sonno': 'entry.2076355969',
@@ -56,11 +55,12 @@ col1, col2 = st.columns(2)
 with col1:
     posizione_corrente = st.text_input("📍 Ti trovi a:", value="Verona")
     temp_massima = st.number_input("Temperatura meteorologica massima (°C)", value=temp_automatica, step=0.5)
-    sonno_scelto = st.selectbox("Qualità del sonno", ["soddisfacente", "discreta", "scarsa"])
+    # Sistemate maiuscole identiche a Google Form
+    sonno_scelto = st.selectbox("Qualità del sonno", ["discreta", "soddisfacente", "scarsa"])
     energia = st.slider("Energia al risveglio", 1.0, 10.0, 5.0, 1.0)
 
 with col2:
-    # Nota: Rimosso il menu passi non presente negli ID del modulo sorgente
+    # Sistemate maiuscole identiche a Google Form
     attivita_scelte = st.multiselect(
         "Attività", 
         ["ufficio", "lavoro da casa", "piccole commissioni", "visita", "fisioterapia", "riposo totale", "sociale"]
@@ -106,12 +106,11 @@ voto_reale = st.slider("Semaforo energetico finale da registrare", 1.0, 10.0, fl
 
 st.write("---")
 
-# --- PULSANTE REGISTRA DEFINITIVO ---
+# --- PULSANTE REGISTRA ---
 if st.button("💾 Registra Giornata nel Database", type="primary"):
     
-    # Costruiamo il payload con i nuovi ID corretti
+    # Rimosso il campo data_comp per lasciare che Google usi il suo timestamp nativo ed evitare il crash del formato
     payload_lista = [
-        (ENTRY_ID['data_comp'], data_oggi.strftime("%Y-%m-%d")),
         (ENTRY_ID['posizione'], posizione_corrente),
         (ENTRY_ID['temp'], str(round(temp_massima, 1)).replace('.', ',')),
         (ENTRY_ID['sonno'], sonno_scelto),
@@ -120,12 +119,9 @@ if st.button("💾 Registra Giornata nel Database", type="primary"):
         (ENTRY_ID['semaforo'], str(int(voto_reale)))
     ]
     
-    # Aggiungiamo le opzioni multiple per le attività (Google vuole un elemento per ogni scelta)
     if attivita_scelte:
         for att in attivita_scelte:
             payload_lista.append((ENTRY_ID['attivita'], att))
-    else:
-        payload_lista.append((ENTRY_ID['attivita'], ""))
         
     try:
         response = requests.post(URL_MODULO, data=payload_lista)
