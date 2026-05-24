@@ -78,13 +78,27 @@ if st.session_state.get('predizione_calcolata', False):
     elif 6 <= valore <= 8: st.warning(f"Stato predetto: GIALLO (Valore: {valore})")
     else: st.success(f"Stato predetto: VERDE (Valore: {valore})")
 
-    st.markdown("---")
+  st.markdown("---")
     st.subheader("📝 Note & Validazione Serale")
+    
     feedback = st.selectbox("Feedback sul predittore:", ["#Match", "#Overestimate", "#Underestimate"])
-    note_input = st.text_area("Note (es. Sintomi, Farmaci, Fattori):")
+
+    # --- NUOVA LEGENDA VISIVA ---
+    st.info("""
+    **🏷️ Tag suggeriti per le tue note:**
+    * **#Sintomo:** (es. formicolio, brain fog)
+    * **#Farmaco:** (es. antidolorifico, nuovo integratore)
+    * **#Clima:** (es. forte umidità, sbalzo barometrico)
+    * **#AttivitàExtra:** (es. cena con mia figlia, lavori per la caldaia)
+    * **#Umore:** (es. sereno, ansia, irritabile)
+    """)
+    
+    note_input = st.text_area("Descrivi la giornata usando i tag:")
 
     if st.button("💾 Registra Giornata Definitiva", type="primary"):
+        # ... (il resto del codice del pulsante rimane identico a quello che già funziona)
         note_complete = f"{feedback} | {note_input}"
+        
         payload = {
             ENTRY_ID['posizione']: posizione,
             ENTRY_ID['temp']: str(int(temp)),
@@ -95,13 +109,12 @@ if st.session_state.get('predizione_calcolata', False):
             ENTRY_ID['passi']: passi,
             ENTRY_ID['note']: note_complete
         }
-        payload_lista = list(payload.items())
-        for a in attivita:
-            payload_lista.append((ENTRY_ID['attivita'], a))
         
         try:
-            response = requests.post(URL_MODULO, data=payload_lista)
-            if response.status_code == 200: st.success("🎉 Registrazione riuscita!")
-            else: st.error(f"Errore: {response.status_code}")
+            response = requests.post(URL_MODULO, data=payload)
+            if response.status_code == 200: 
+                st.success("🎉 Registrazione riuscita!")
+            else: 
+                st.error(f"Errore {response.status_code}: Il modulo non ha accettato i dati.")
         except Exception as e:
             st.error(f"Errore connessione: {e}")
