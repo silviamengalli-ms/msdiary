@@ -74,16 +74,17 @@ if st.button("🔄 Calcola Predizione AI"):
 if st.session_state.get('predizione_calcolata', False):
     valore = st.session_state['semaforo_predetto']
     
-    if valore <= 5: st.error(f"Stato predetto: ROSSO (Valore: {valore})")
-    elif 6 <= valore <= 8: st.warning(f"Stato predetto: GIALLO (Valore: {valore})")
-    else: st.success(f"Stato predetto: VERDE (Valore: {valore})")
+    if valore <= 5: 
+        st.error(f"Stato predetto: ROSSO (Valore: {valore})")
+    elif 6 <= valore <= 8: 
+        st.warning(f"Stato predetto: GIALLO (Valore: {valore})")
+    else: 
+        st.success(f"Stato predetto: VERDE (Valore: {valore})")
 
-  st.markdown("---")
+    st.markdown("---")
     st.subheader("📝 Note & Validazione Serale")
-    
     feedback = st.selectbox("Feedback sul predittore:", ["#Match", "#Overestimate", "#Underestimate"])
 
-    # --- NUOVA LEGENDA VISIVA ---
     st.info("""
     **🏷️ Tag suggeriti per le tue note:**
     * **#Sintomo:** (es. formicolio, brain fog)
@@ -96,9 +97,7 @@ if st.session_state.get('predizione_calcolata', False):
     note_input = st.text_area("Descrivi la giornata usando i tag:")
 
     if st.button("💾 Registra Giornata Definitiva", type="primary"):
-        # ... (il resto del codice del pulsante rimane identico a quello che già funziona)
         note_complete = f"{feedback} | {note_input}"
-        
         payload = {
             ENTRY_ID['posizione']: posizione,
             ENTRY_ID['temp']: str(int(temp)),
@@ -110,8 +109,12 @@ if st.session_state.get('predizione_calcolata', False):
             ENTRY_ID['note']: note_complete
         }
         
+        payload_lista = list(payload.items())
+        for a in attivita:
+            payload_lista.append((ENTRY_ID['attivita'], a))
+        
         try:
-            response = requests.post(URL_MODULO, data=payload)
+            response = requests.post(URL_MODULO, data=payload_lista)
             if response.status_code == 200: 
                 st.success("🎉 Registrazione riuscita!")
             else: 
