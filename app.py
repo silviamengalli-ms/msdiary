@@ -91,7 +91,7 @@ if st.session_state.get('predizione_calcolata', False):
             ENTRY_ID['sonno']: sonno,
             ENTRY_ID['energia']: str(energia),
             ENTRY_ID['dolore']: str(dolore), 
-            ENTRY_ID['semaforo']: str(valore),
+            ENTRY_ID['semaforo']: str(valore).replace(".", ","),
             ENTRY_ID['passi']: passi,
             ENTRY_ID['note']: note_complete
         }
