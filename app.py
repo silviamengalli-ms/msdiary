@@ -87,11 +87,10 @@ if st.session_state.get('predizione_calcolata', False):
 
     st.info("""
     **🏷️ Tag suggeriti per le tue note:**
-    * **#Sintomo:** (es. formicolio, brain fog)
-    * **#Farmaco:** (es. antidolorifico, nuovo integratore)
-    * **#Clima:** (es. forte umidità, sbalzo barometrico)
-    * **#AttivitàExtra:** (es. cena con mia figlia, lavori per la caldaia)
-    * **#Umore:** (es. sereno, ansia, irritabile)
+    * **#Sintomo:** 
+    * **#Farmaco:** 
+    * **#Clima:** 
+    * **#Umore:** 
     """)
     
     note_input = st.text_area("Descrivi la giornata usando i tag:")
