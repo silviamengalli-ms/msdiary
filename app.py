@@ -10,7 +10,7 @@ st.set_page_config(page_title="MS Diary - Predizione", page_icon="📊", layout=
 URL_MODULO = "https://docs.google.com/forms/d/e/1FAIpQLSfsNrtCcCMKrQ22pM-7NfrW7F9xWvtUSZPNBu83AgV9ZyWtDQ/formResponse"
 
 ENTRY_ID = {
-    'data': 'entry.2022449610',
+    'data': 'entry.2022449610',  # ID base della data
     'posizione': 'entry.1412086707',
     'temp': 'entry.1900939990',
     'sonno': 'entry.2076355969',
@@ -18,8 +18,8 @@ ENTRY_ID = {
     'attivita': 'entry.1595201387',
     'semaforo': 'entry.625659299',
     'dolore': 'entry.672372933',
-    'passi': 'entry.28384771'
-    # 'note': 'entry.158362423' <-- Escluso temporaneamente per test
+    'passi': 'entry.28384771',
+    'note': 'entry.158362423'
 }
 
 URL_FOGLIO_CSV = "https://docs.google.com/spreadsheets/d/1eSnvfouOdaL-sakQgwKCItUEKXN-96ECF93KD96cx-E/export?format=csv&gid=0"
@@ -84,26 +84,42 @@ else:
 
 # --- SEZIONE DIARIO / SERALE ---
 st.markdown("---")
-st.subheader("📝 Note & Validazione Serale (Disabilitate per Test)")
+st.subheader("📝 Note & Validazione Serale")
 
 feedback = st.selectbox("Feedback sul predittore:", ["#Match", "#Overestimate", "#Underestimate"])
-note_input = st.text_area("Descrivi la giornata usando i tag (il testo non verrà inviato in questo test):")
+
+st.info("""
+**🏷️ Tag suggeriti per le tue note:**
+* **#Sintomo:** (es. #sintomo: brainfog)
+* **#Farmaco:** (es. #farmaco: integratore)
+* **#Clima:** (es. #clima: umido)
+* **#AttivitàExtra:** (es. #attivitàextra: spesa)
+""")
+
+note_input = st.text_area("Descrivi la giornata usando i tag:")
 
 # --- INVIO DATI ---
 if st.button("💾 Registra Giornata Definitiva", type="primary"):
+    if note_input.strip():
+        note_complete = f"{feedback} | {note_input}"
+    else:
+        note_complete = feedback
     
-    data_oggi = datetime.date.today().strftime("%d/%m/%Y")
+    oggi = datetime.date.today()
     
-    # Payload senza il campo note
+    # Costruiamo il payload dividendo la data nei tre sotto-campi richiesti da Google
     payload = {
-        ENTRY_ID['data']: data_oggi,
+        f"{ENTRY_ID['data']}_year": str(oggi.year),
+        f"{ENTRY_ID['data']}_month": f"{oggi.month:02d}",
+        f"{ENTRY_ID['data']}_day": f"{oggi.day:02d}",
         ENTRY_ID['posizione']: posizione,
         ENTRY_ID['temp']: str(int(temp)),
         ENTRY_ID['sonno']: sonno,
         ENTRY_ID['energia']: str(energia),
         ENTRY_ID['dolore']: str(dolore), 
         ENTRY_ID['semaforo']: str(int(round(valore_calcolato))),
-        ENTRY_ID['passi']: passi
+        ENTRY_ID['passi']: passi,
+        ENTRY_ID['note']: note_complete
     }
     
     payload_lista = list(payload.items())
@@ -113,10 +129,10 @@ if st.button("💾 Registra Giornata Definitiva", type="primary"):
     try:
         response = requests.post(URL_MODULO, data=payload_lista)
         if response.status_code == 200: 
-            st.success("🎉 Registrazione riuscita con successo senza le note!")
+            st.success("🎉 Registrazione riuscita con successo!")
         else: 
-            st.error(f"Errore {response.status_code}: Il modulo ha rifiutato i dati anche senza note.")
-            st.write("### 🔍 Ispettore Dati Attuale:")
+            st.error(f"Errore {response.status_code}: Il modulo ha rifiutato i dati.")
+            st.write("### 🔍 Ispettore Dati:")
             st.write(payload_lista)
             
     except Exception as e:
