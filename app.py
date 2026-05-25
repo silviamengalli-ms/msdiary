@@ -44,7 +44,6 @@ st.title("📊 Il Mio Diario & Predittore")
 
 col1, col2 = st.columns(2)
 with col1:
-    # CORRETTO: Ora mostra la data visivamente come GG/MM/AAAA (DD/MM/YYYY)
     data_selezionata = st.date_input("📅 Data della giornata:", value=datetime.date.today(), format="DD/MM/YYYY")
     posizione = st.text_input("📍 Luogo:", value="Verona")
     temp = st.number_input("Temperatura (°C)", value=recupera_meteo_automatico(data_selezionata))
@@ -59,7 +58,6 @@ with col2:
 st.markdown("---")
 st.subheader("🔮 Stato del Semaforo")
 
-# Inizializziamo il valore nel session_state se non esiste
 if 'semaforo_predetto' not in st.session_state:
     st.session_state['semaforo_predetto'] = 5.0
 
@@ -93,7 +91,7 @@ st.subheader("📝 Note & Validazione Serale")
 feedback = st.selectbox("Feedback sul predittore:", ["#Match", "#Overestimate", "#Underestimate"])
 
 st.info("""
-**🏷️ Tag suggeriti per le tu note:**
+**🏷️ Tag suggeriti per le tue note:**
 * **#Sintomo:** (es. #sintomo: brainfog)
 * **#Farmaco:** (es. #farmaco: integratore)
 * **#Clima:** (es. #clima: umido)
@@ -109,13 +107,9 @@ if st.button("💾 Registra Giornata Definitiva", type="primary"):
     else:
         note_complete = feedback
     
-    # Payload configurato con il formato italiano DD/MM/YYYY per Google Forms
+    # Payload PULITO: Solo la data in formato GG/MM/AAAA, senza estensioni strane
     payload = {
         ENTRY_ID['data']: data_selezionata.strftime("%d/%m/%Y"),
-        f"{ENTRY_ID['data']}_year": str(data_selezionata.year),
-        f"{ENTRY_ID['data']}_month": f"{data_selezionata.month:02d}",
-        f"{ENTRY_ID['data']}_day": f"{data_selezionata.day:02d}",
-        
         ENTRY_ID['posizione']: posizione,
         ENTRY_ID['temp']: str(int(temp)),
         ENTRY_ID['sonno']: sonno,
