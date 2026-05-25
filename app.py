@@ -2,10 +2,11 @@ import streamlit as st
 import datetime
 import requests
 
-st.set_page_config(page_title="MS Diary - Debug", layout="centered")
+# --- CONFIGURAZIONE ---
+st.set_page_config(page_title="MS Diary - Definitivo", layout="centered")
 
-# --- ID CAMPI ---
 URL_MODULO = "https://docs.google.com/forms/d/e/1FAIpQLSfsNrtCcCMKrQ22pM-7NfrW7F9xWvtUSZPNBu83AgV9ZyWtDQ/formResponse"
+
 ENTRY_ID = {
     'data': 'entry.2022449610',
     'posizione': 'entry.1412086707',
@@ -19,25 +20,47 @@ ENTRY_ID = {
     'note': 'entry.158362423'
 }
 
-# --- UI SEMPLIFICATA PER TEST ---
-st.title("🔧 Debug Invio Dati")
-data_sel = st.date_input("Data", value=datetime.date.today())
-note_val = st.text_input("Nota", value="Test invio")
+PESI_ATTIVITA = {
+    "ufficio": -0.5, "lavoro da casa": -0.1, "piccole commissioni": -0.4, 
+    "visita": -0.5, "fisioterapia": -0.4, "riposo totale": 0.5, "sociale": -0.7
+}
 
-if st.button("🚀 INVIA TEST"):
-    # Prepariamo solo i dati essenziali
-    dati = [
-        (ENTRY_ID['data'], data_sel.strftime("%Y-%m-%d")), 
-        (ENTRY_ID['note'], note_val)
+# --- INTERFACCIA ---
+st.title("📊 Diario MS")
+data_sel = st.date_input("Data:", value=datetime.date.today())
+posizione = st.text_input("Luogo:", value="Verona")
+sonno = st.selectbox("Sonno:", ["discreta", "soddisfacente", "scarsa"])
+energia = st.slider("Energia (1-10):", 1, 10, 5)
+passi = st.selectbox("Passi:", ["fino a 1000", "da 1001 a 3000", "oltre i 3000"])
+attivita = st.multiselect("Attività:", list(PESI_ATTIVITA.keys()))
+dolore = st.slider("Dolore:", 1, 10, 1)
+note_input = st.text_area("Note:")
+feedback = st.selectbox("Feedback:", ["#Match", "#Overestimate", "#Underestimate"])
+
+# --- INVIO ---
+if st.button("💾 Registra Giornata"):
+    # Costruiamo la lista di dati come tuple (chiave, valore)
+    # Fondamentale: inviamo ogni attività come voce separata con lo stesso ENTRY ID
+    payload = [
+        (ENTRY_ID['data'], data_sel.strftime("%Y-%m-%d")),
+        (ENTRY_ID['posizione'], posizione),
+        (ENTRY_ID['sonno'], sonno),
+        (ENTRY_ID['energia'], str(energia)),
+        (ENTRY_ID['passi'], passi),
+        (ENTRY_ID['dolore'], str(dolore)),
+        (ENTRY_ID['semaforo'], "5"), # Valore di test
+        (ENTRY_ID['note'], f"{feedback} {note_input}")
     ]
     
+    # Aggiungi le attività multiple
+    for item in attivita:
+        payload.append((ENTRY_ID['attivita'], item))
+    
     try:
-        r = requests.post(URL_MODULO, data=dati)
+        r = requests.post(URL_MODULO, data=payload)
         if r.status_code == 200:
-            st.success("✅ Successo!")
+            st.success("✅ Giornata registrata correttamente!")
         else:
-            st.error(f"❌ Errore {r.status_code}")
-            st.write("Dati inviati:", dati)
-            st.write("Verifica se il link URL_MODULO è corretto e se il modulo accetta risposte.")
+            st.error(f"❌ Errore HTTP {r.status_code}")
     except Exception as e:
-        st.error(f"Errore: {e}")
+        st.error(f"⚠️ Errore: {e}")
