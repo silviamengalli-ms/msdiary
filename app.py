@@ -3,9 +3,10 @@ import pandas as pd
 import datetime
 import requests
 
-# --- CONFIGURAZIONE ---
+# --- CONFIGURAZIONE INTERFACCIA ---
 st.set_page_config(page_title="MS Diary - Predizione", page_icon="📊", layout="centered")
 
+# --- ACCOPPIAMENTO GOOGLE (DATI REALI REINTEGRATI) ---
 URL_MODULO = "https://docs.google.com/forms/d/e/1FAIpQLSfsNrtCcCMKrQ22pM-7NfrW7F9xWvtUSZPNBu83AgV9ZyWtDQ/formResponse"
 
 ENTRY_ID = {
@@ -22,12 +23,17 @@ ENTRY_ID = {
 
 URL_FOGLIO_CSV = "https://docs.google.com/spreadsheets/d/1eSnvfouOdaL-sakQgwKCItUEKXN-96ECF93KD96cx-E/export?format=csv&gid=0"
 
-# --- PARAMETRI ---
+# --- PARAMETRI LOGICA AI (PESI FISSI) ---
 PESI_SONNO = {"discreta": 0.0, "soddisfacente": 1.0, "scarsa": -1.5}
 PESI_PASSI = {"fino a 1000": 0.5, "da 1001 a 3000": 0.0, "oltre 3000": -0.5}
 PESI_ATTIVITA = {
-    "ufficio": -0.5, "lavoro da casa": -0.1, "piccole commissioni": -0.4, 
-    "visita": -0.5, "fisioterapia": -0.4, "riposo totale": 0.5, "sociale": -0.7
+    "ufficio": -0.5, 
+    "lavoro da casa": -0.1, 
+    "piccole commissioni": -0.4, 
+    "visita": -0.5, 
+    "fisioterapia": -0.4, 
+    "riposo totale": 0.5, 
+    "sociale": -0.7
 }
 
 def recupera_meteo_automatico(data_target):
@@ -39,7 +45,7 @@ def recupera_meteo_automatico(data_target):
     except:
         return 20.0
 
-# --- INTERFACCIA ---
+# --- INTERFACCIA UTENTE ---
 st.title("📊 Il Mio Diario & Predittore")
 
 col1, col2 = st.columns(2)
@@ -53,7 +59,7 @@ with col2:
     attivita = st.multiselect("Attività", ["ufficio", "lavoro da casa", "piccole commissioni", "visita", "fisioterapia", "riposo totale", "sociale"])
     dolore = st.slider("Dolore (1-10 - dato background):", 1, 10, 1)
 
-# --- LOGICA AI ---
+# --- CALCOLO PREDIZIONE ---
 st.subheader("🔮 Stato del Semaforo")
 
 if st.button("🔄 Calcola Predizione AI"):
@@ -87,16 +93,21 @@ if st.session_state.get('predizione_calcolata', False):
 
     st.info("""
     **🏷️ Tag suggeriti per le tue note:**
-    * **#Sintomo:** 
-    * **#Farmaco:** 
-    * **#Clima:** 
-    * **#Umore:** 
+    * **#Sintomo:** (es. formicolio, brainfog)
+    * **#Farmaco:** (es. antidolorifico, nuovo integratore)
+    * **#Clima:** (es. forte umidità, sbalzo barometrico)
+    * **#AttivitàExtra:** (es. cena con mia figlia, lavori per la caldaia)
+    * **#Umore:** (es. sereno, ansia, irritabile)
     """)
     
     note_input = st.text_area("Descrivi la giornata usando i tag:")
 
     if st.button("💾 Registra Giornata Definitiva", type="primary"):
-        note_complete = f"{feedback} | {note_input}"
+        if note_input.strip():
+            note_complete = f"{feedback} | {note_input}"
+        else:
+            note_complete = feedback
+        
         payload = {
             ENTRY_ID['posizione']: posizione,
             ENTRY_ID['temp']: str(int(temp)),
@@ -117,6 +128,6 @@ if st.session_state.get('predizione_calcolata', False):
             if response.status_code == 200: 
                 st.success("🎉 Registrazione riuscita!")
             else: 
-                st.error(f"Errore {response.status_code}: Il modulo non ha accettato i dati.")
+                st.error(f"Errore {response.status_code}: Il modulo non ha accettato i dati. Controlla gli Entry ID.")
         except Exception as e:
             st.error(f"Errore connessione: {e}")
