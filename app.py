@@ -18,8 +18,8 @@ ENTRY_ID = {
     'attivita': 'entry.1595201387',
     'semaforo': 'entry.625659299',
     'dolore': 'entry.672372933',
-    'passi': 'entry.28384771',
-    'note': 'entry.158362423'
+    'passi': 'entry.28384771'
+    # 'note': 'entry.158362423' <-- Escluso temporaneamente per test
 }
 
 URL_FOGLIO_CSV = "https://docs.google.com/spreadsheets/d/1eSnvfouOdaL-sakQgwKCItUEKXN-96ECF93KD96cx-E/export?format=csv&gid=0"
@@ -73,7 +73,6 @@ if st.button("🔄 Calcola Predizione AI"):
         
     st.session_state['semaforo_predetto'] = round(max(1.0, min(10.0, score)), 1)
 
-# Recupero del valore predizione
 valore_calcolato = st.session_state.get('semaforo_predetto', 5.0)
 
 if valore_calcolato <= 5: 
@@ -85,30 +84,17 @@ else:
 
 # --- SEZIONE DIARIO / SERALE ---
 st.markdown("---")
-st.subheader("📝 Note & Validazione Serale")
+st.subheader("📝 Note & Validazione Serale (Disabilitate per Test)")
 
 feedback = st.selectbox("Feedback sul predittore:", ["#Match", "#Overestimate", "#Underestimate"])
-
-st.info("""
-**🏷️ Tag suggeriti per le tue note:**
-* **#Sintomo:** (es. #sintomo: brainfog)
-* **#Farmaco:** (es. #farmaco: integratore)
-* **#Clima:** (es. #clima: umido)
-* **#AttivitàExtra:** (es. #attivitàextra: spesa)
-""")
-
-note_input = st.text_area("Descrivi la giornata usando i tag:")
+note_input = st.text_area("Descrivi la giornata usando i tag (il testo non verrà inviato in questo test):")
 
 # --- INVIO DATI ---
 if st.button("💾 Registra Giornata Definitiva", type="primary"):
-    if note_input.strip():
-        note_complete = f"{feedback} | {note_input}"
-    else:
-        note_complete = feedback
     
-    # FORMATO DATA CORRETTO: Cambiato in GG/MM/AAAA per i moduli italiani
     data_oggi = datetime.date.today().strftime("%d/%m/%Y")
     
+    # Payload senza il campo note
     payload = {
         ENTRY_ID['data']: data_oggi,
         ENTRY_ID['posizione']: posizione,
@@ -117,8 +103,7 @@ if st.button("💾 Registra Giornata Definitiva", type="primary"):
         ENTRY_ID['energia']: str(energia),
         ENTRY_ID['dolore']: str(dolore), 
         ENTRY_ID['semaforo']: str(int(round(valore_calcolato))),
-        ENTRY_ID['passi']: passi,
-        ENTRY_ID['note']: note_complete
+        ENTRY_ID['passi']: passi
     }
     
     payload_lista = list(payload.items())
@@ -128,10 +113,10 @@ if st.button("💾 Registra Giornata Definitiva", type="primary"):
     try:
         response = requests.post(URL_MODULO, data=payload_lista)
         if response.status_code == 200: 
-            st.success("🎉 Registrazione riuscita con successo!")
+            st.success("🎉 Registrazione riuscita con successo senza le note!")
         else: 
-            st.error(f"Errore {response.status_code}: Il modulo ha rifiutato i dati.")
-            st.write("### 🔍 Ispettore Dati:")
+            st.error(f"Errore {response.status_code}: Il modulo ha rifiutato i dati anche senza note.")
+            st.write("### 🔍 Ispettore Dati Attuale:")
             st.write(payload_lista)
             
     except Exception as e:
