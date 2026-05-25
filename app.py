@@ -9,7 +9,6 @@ st.set_page_config(page_title="MS Diary - Predizione", page_icon="📊", layout=
 # --- ACCOPPIAMENTO GOOGLE (DATI REALI) ---
 URL_MODULO = "https://docs.google.com/forms/d/e/1FAIpQLSfsNrtCcCMKrQ22pM-7NfrW7F9xWvtUSZPNBu83AgV9ZyWtDQ/formResponse"
 
-# Aggiornato con il campo DATA scovato dal link precompilato
 ENTRY_ID = {
     'data': 'entry.2022449610',
     'posizione': 'entry.1412086707',
@@ -107,11 +106,11 @@ if st.button("💾 Registra Giornata Definitiva", type="primary"):
     else:
         note_complete = feedback
     
-    # Data di oggi formattata come richiesto da Google Forms (AAAA-MM-GG)
-    data_oggi = datetime.date.today().strftime("%Y-%m-%d")
+    # FORMATO DATA CORRETTO: Cambiato in GG/MM/AAAA per i moduli italiani
+    data_oggi = datetime.date.today().strftime("%d/%m/%Y")
     
     payload = {
-        ENTRY_ID['data']: data_oggi,  # <--- Inserita la data mancante!
+        ENTRY_ID['data']: data_oggi,
         ENTRY_ID['posizione']: posizione,
         ENTRY_ID['temp']: str(int(temp)),
         ENTRY_ID['sonno']: sonno,
@@ -132,8 +131,6 @@ if st.button("💾 Registra Giornata Definitiva", type="primary"):
             st.success("🎉 Registrazione riuscita con successo!")
         else: 
             st.error(f"Errore {response.status_code}: Il modulo ha rifiutato i dati.")
-            
-            # Lasciamo l'ispettore per sicurezza, ma ora andrà sul velluto
             st.write("### 🔍 Ispettore Dati:")
             st.write(payload_lista)
             
