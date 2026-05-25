@@ -10,7 +10,7 @@ st.set_page_config(page_title="MS Diary - Predizione", page_icon="📊", layout=
 URL_MODULO = "https://docs.google.com/forms/d/e/1FAIpQLSfsNrtCcCMKrQ22pM-7NfrW7F9xWvtUSZPNBu83AgV9ZyWtDQ/formResponse"
 
 ENTRY_ID = {
-    'data': 'entry.2022449610',  # ID base della data
+    'data': 'entry.2022449610',
     'posizione': 'entry.1412086707',
     'temp': 'entry.1900939990',
     'sonno': 'entry.2076355969',
@@ -46,8 +46,9 @@ st.title("📊 Il Mio Diario & Predittore")
 
 col1, col2 = st.columns(2)
 with col1:
+    data_selezionata = st.date_input("📅 Data della giornata:", datetime.date.today())
     posizione = st.text_input("📍 Luogo:", value="Verona")
-    temp = st.number_input("Temperatura (°C)", value=recupera_meteo_automatico(datetime.date.today()))
+    temp = st.number_input("Temperatura (°C)", value=recupera_meteo_automatico(data_selezionata))
     sonno = st.selectbox("Sonno", ["discreta", "soddisfacente", "scarsa"])
     energia = st.slider("Energia al risveglio (1-10):", 1, 10, 5)
 with col2:
@@ -74,66 +75,3 @@ if st.button("🔄 Calcola Predizione AI"):
     st.session_state['semaforo_predetto'] = round(max(1.0, min(10.0, score)), 1)
 
 valore_calcolato = st.session_state.get('semaforo_predetto', 5.0)
-
-if valore_calcolato <= 5: 
-    st.error(f"Stato predetto: ROSSO (Valore calcolato: {valore_calcolato})")
-elif 6 <= valore_calcolato <= 8: 
-    st.warning(f"Stato predetto: GIALLO (Valore calcolato: {valore_calcolato})")
-else: 
-    st.success(f"Stato predetto: VERDE (Valore calcolato: {valore_calcolato})")
-
-# --- SEZIONE DIARIO / SERALE ---
-st.markdown("---")
-st.subheader("📝 Note & Validazione Serale")
-
-feedback = st.selectbox("Feedback sul predittore:", ["#Match", "#Overestimate", "#Underestimate"])
-
-st.info("""
-**🏷️ Tag suggeriti per le tue note:**
-* **#Sintomo:** (es. #sintomo: brainfog)
-* **#Farmaco:** (es. #farmaco: integratore)
-* **#Clima:** (es. #clima: umido)
-* **#AttivitàExtra:** (es. #attivitàextra: spesa)
-""")
-
-note_input = st.text_area("Descrivi la giornata usando i tag:")
-
-# --- INVIO DATI ---
-if st.button("💾 Registra Giornata Definitiva", type="primary"):
-    if note_input.strip():
-        note_complete = f"{feedback} | {note_input}"
-    else:
-        note_complete = feedback
-    
-    oggi = datetime.date.today()
-    
-    # Costruiamo il payload dividendo la data nei tre sotto-campi richiesti da Google
-    payload = {
-        f"{ENTRY_ID['data']}_year": str(oggi.year),
-        f"{ENTRY_ID['data']}_month": f"{oggi.month:02d}",
-        f"{ENTRY_ID['data']}_day": f"{oggi.day:02d}",
-        ENTRY_ID['posizione']: posizione,
-        ENTRY_ID['temp']: str(int(temp)),
-        ENTRY_ID['sonno']: sonno,
-        ENTRY_ID['energia']: str(energia),
-        ENTRY_ID['dolore']: str(dolore), 
-        ENTRY_ID['semaforo']: str(int(round(valore_calcolato))),
-        ENTRY_ID['passi']: passi,
-        ENTRY_ID['note']: note_complete
-    }
-    
-    payload_lista = list(payload.items())
-    for a in attivita:
-        payload_lista.append((ENTRY_ID['attivita'], a))
-    
-    try:
-        response = requests.post(URL_MODULO, data=payload_lista)
-        if response.status_code == 200: 
-            st.success("🎉 Registrazione riuscita con successo!")
-        else: 
-            st.error(f"Errore {response.status_code}: Il modulo ha rifiutato i dati.")
-            st.write("### 🔍 Ispettore Dati:")
-            st.write(payload_lista)
-            
-    except Exception as e:
-        st.error(f"Errore connessione: {e}")
