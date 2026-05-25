@@ -6,12 +6,19 @@ import requests
 # --- CONFIGURAZIONE ---
 st.set_page_config(page_title="MS Diary - Predizione", layout="centered")
 
-# --- COSTANTI & ID ---
+# --- COSTANTI & ID (Verificati sui tuoi file CSV) ---
 URL_MODULO = "https://docs.google.com/forms/d/e/1FAIpQLSfsNrtCcCMKrQ22pM-7NfrW7F9xWvtUSZPNBu83AgV9ZyWtDQ/formResponse"
 ENTRY_ID = {
-    'data': 'entry.2022449610', 'posizione': 'entry.1412086707', 'temp': 'entry.1900939990',
-    'sonno': 'entry.2076355969', 'energia': 'entry.1596414247', 'attivita': 'entry.1595201387',
-    'semaforo': 'entry.625659299', 'dolore': 'entry.672372933', 'passi': 'entry.28384771', 'note': 'entry.158362423'
+    'data': 'entry.2022449610',
+    'posizione': 'entry.1412086707',
+    'temp': 'entry.1900939990',
+    'sonno': 'entry.2076355969',
+    'energia': 'entry.1596414247',
+    'attivita': 'entry.1595201387',
+    'semaforo': 'entry.625659299',
+    'dolore': 'entry.672372933',
+    'passi': 'entry.28384771',
+    'note': 'entry.158362423'
 }
 
 # --- LOGICA AI ---
@@ -59,8 +66,9 @@ note_input = st.text_area("Note (usa tag):")
 feedback = st.selectbox("Feedback:", ["#Match", "#Overestimate", "#Underestimate"])
 
 if st.button("💾 Registra Giornata"):
+    # Costruzione payload rigorosa
     payload = {
-        ENTRY_ID['data']: data_sel.strftime("%d/%m/%Y"),
+        ENTRY_ID['data']: data_sel.strftime("%Y-%m-%d"), # Google vuole questo formato internamente
         ENTRY_ID['posizione']: posizione,
         ENTRY_ID['temp']: str(int(temp)),
         ENTRY_ID['sonno']: sonno,
@@ -70,11 +78,19 @@ if st.button("💾 Registra Giornata"):
         ENTRY_ID['passi']: passi,
         ENTRY_ID['note']: f"{feedback} {note_input}"
     }
-    lista_dati = [(k, v) for k, v in payload.items()]
-    for a in attivita: lista_dati.append((ENTRY_ID['attivita'], a))
     
+    # Prepariamo la lista per le attività multiple
+    lista_dati = list(payload.items())
+    for a in attivita:
+        lista_dati.append((ENTRY_ID['attivita'], a))
+    
+    # Invio con debug
     try:
-        if requests.post(URL_MODULO, data=lista_dati).status_code == 200:
-            st.success("Registrato!")
-        else: st.error("Errore invio.")
-    except Exception as e: st.error(f"Errore: {e}")
+        r = requests.post(URL_MODULO, data=lista_dati)
+        if r.status_code == 200:
+            st.success("✅ Dati inviati con successo!")
+        else:
+            st.error(f"❌ Errore HTTP {r.status_code}: Google ha rifiutato la richiesta.")
+            st.json(dict(lista_dati)) # Visualizza i dati che abbiamo provato a inviare
+    except Exception as e:
+        st.error(f"⚠️ Errore di sistema: {e}")
