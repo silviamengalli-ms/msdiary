@@ -72,7 +72,7 @@ if st.button("🔄 Calcola Predizione AI"):
         
     st.session_state['semaforo_predetto'] = round(max(1.0, min(10.0, score)), 1)
 
-# Recuperiamo il valore calcolato (default 5.0 se non ancora premuto il tasto)
+# Recupero del valore predizione
 valore_calcolato = st.session_state.get('semaforo_predetto', 5.0)
 
 if valore_calcolato <= 5: 
@@ -105,13 +105,13 @@ if st.button("💾 Registra Giornata Definitiva", type="primary"):
     else:
         note_complete = feedback
     
+    # Costruzione payload identica al backup funzionante
     payload = {
         ENTRY_ID['posizione']: posizione,
         ENTRY_ID['temp']: str(int(temp)),
         ENTRY_ID['sonno']: sonno,
         ENTRY_ID['energia']: str(energia),
         ENTRY_ID['dolore']: str(dolore), 
-        # Arrotonda all'intero più vicino per il modulo Google
         ENTRY_ID['semaforo']: str(int(round(valore_calcolato))),
         ENTRY_ID['passi']: passi,
         ENTRY_ID['note']: note_complete
@@ -126,6 +126,12 @@ if st.button("💾 Registra Giornata Definitiva", type="primary"):
         if response.status_code == 200: 
             st.success("🎉 Registrazione riuscita con successo!")
         else: 
-            st.error(f"Errore {response.status_code}: Il modulo ha rifiutato i dati. Controlla la corrispondenza dei campi.")
+            st.error(f"Errore {response.status_code}: Il modulo ha rifiutato i dati.")
+            
+            # --- ISPETTORE DIAGNOSTICO ---
+            st.write("### 🔍 Ispettore Dati (Cosa stiamo inviando a Google):")
+            st.warning("Confronta questi valori con le opzioni reali sul tuo Modulo Google per trovare l'errore (es. controlla maiuscole/minuscole o campi obbligatori lasciati vuoti):")
+            st.write(payload_lista)
+            
     except Exception as e:
         st.error(f"Errore connessione: {e}")
