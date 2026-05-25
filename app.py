@@ -66,7 +66,7 @@ note_input = st.text_area("Note (usa tag):")
 feedback = st.selectbox("Feedback:", ["#Match", "#Overestimate", "#Underestimate"])
 
 if st.button("💾 Registra Giornata"):
-    # Lista di tuple per gestire correttamente i duplicati (le checkbox di Google)
+    # Lista corretta senza parentesi mancanti o extra
     dati = [
         (ENTRY_ID['data'], data_sel.strftime("%Y-%m-%d")),
         (ENTRY_ID['posizione'], posizione),
@@ -74,12 +74,12 @@ if st.button("💾 Registra Giornata"):
         (ENTRY_ID['sonno'], sonno),
         (ENTRY_ID['energia'], str(energia)),
         (ENTRY_ID['dolore'], str(dolore)),
-        (ENTRY_ID['semaforo'], str(int(round(valore_sem))),
+        (ENTRY_ID['semaforo'], str(int(round(valore_sem)))),
         (ENTRY_ID['passi'], passi),
         (ENTRY_ID['note'], f"{feedback} {note_input}")
     ]
     
-    # Aggiungi le attività come chiavi ripetute (fondamentale per le checkbox)
+    # Aggiungi le attività come chiavi ripetute per Google Forms
     for a in attivita:
         dati.append((ENTRY_ID['attivita'], a))
         
@@ -88,6 +88,6 @@ if st.button("💾 Registra Giornata"):
         if r.status_code == 200:
             st.success("✅ Dati inviati con successo!")
         else:
-            st.error(f"❌ Errore HTTP {r.status_code}. Il modulo ha rifiutato i dati.")
+            st.error(f"❌ Errore HTTP {r.status_code}.")
     except Exception as e:
         st.error(f"⚠️ Errore di connessione: {e}")
