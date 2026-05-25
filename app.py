@@ -1,35 +1,48 @@
-# --- INVIO DATI (VERSIONE BLINDATA) ---
-if st.button("💾 Registra Giornata Definitiva", type="primary"):
-    # Componiamo la nota senza caratteri speciali dubbi
-    note_complete = f"{feedback} {note_input}" if note_input.strip() else feedback
-    
-    # Prepariamo il payload
+import streamlit as st
+import datetime
+import requests
+
+# 1. Configurazione base (sempre per prima)
+st.set_page_config(page_title="MS Diary", layout="centered")
+
+# 2. Costanti
+URL_MODULO = "https://docs.google.com/forms/d/e/1FAIpQLSfsNrtCcCMKrQ22pM-7NfrW7F9xWvtUSZPNBu83AgV9ZyWtDQ/formResponse"
+ENTRY_ID = {
+    'data': 'entry.2022449610',
+    'posizione': 'entry.1412086707',
+    'temp': 'entry.1900939990',
+    'sonno': 'entry.2076355969',
+    'energia': 'entry.1596414247',
+    'attivita': 'entry.1595201387',
+    'semaforo': 'entry.625659299',
+    'dolore': 'entry.672372933',
+    'passi': 'entry.28384771',
+    'note': 'entry.158362423'
+}
+
+# 3. Interfaccia
+st.title("📊 Diario MS")
+
+# (Tutte le tue input fields vanno qui, indentate correttamente)
+data = st.date_input("Data", value=datetime.date.today())
+pos = st.text_input("Luogo", value="Verona")
+sonno = st.selectbox("Sonno", ["discreta", "soddisfacente", "scarsa"])
+# ... (inserisci qui gli altri input) ...
+
+# 4. Bottone (Gestito correttamente)
+if st.button("💾 Registra"):
+    # Questo blocco viene eseguito solo al click
     payload = {
-        ENTRY_ID['data']: data_selezionata.strftime("%d/%m/%Y"), # Formato testuale DD/MM/YYYY
-        ENTRY_ID['posizione']: posizione,
-        ENTRY_ID['temp']: str(int(temp)),
-        ENTRY_ID['sonno']: sonno,
-        ENTRY_ID['energia']: str(energia),
-        ENTRY_ID['dolore']: str(dolore), 
-        ENTRY_ID['semaforo']: str(int(round(valore_calcolato))),
-        ENTRY_ID['passi']: passi,
-        ENTRY_ID['note']: note_complete
+        ENTRY_ID['data']: data.strftime("%d/%m/%Y"),
+        ENTRY_ID['posizione']: pos,
+        # ... aggiungi qui il resto ...
     }
     
-    # Gestione attività multiple
-    payload_lista = [(k, v) for k, v in payload.items()]
-    for a in attivita:
-        payload_lista.append((ENTRY_ID['attivita'], a))
-    
     try:
-        # Usiamo headers per simulare un browser e inviare il form
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.post(URL_MODULO, data=payload_lista, headers=headers)
-        
+        response = requests.post(URL_MODULO, data=payload)
         if response.status_code == 200:
-            st.success("🎉 Registrazione riuscita!")
+            st.success("Inviato!")
         else:
-            st.error(f"Errore {response.status_code}. Il modulo non ha accettato i dati.")
-            st.write("Dati inviati:", payload_lista)
+            st.error("Errore invio")
     except Exception as e:
-        st.error(f"Errore critico: {e}")
+        st.error(f"Errore: {e}")
