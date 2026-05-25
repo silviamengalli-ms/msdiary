@@ -102,12 +102,12 @@ note_input = st.text_area("Descrivi la giornata usando i tag:")
 
 # --- INVIO DATI ---
 if st.button("💾 Registra Giornata Definitiva", type="primary"):
+    # Formattazione modificata: omessa la barra verticale (|), ora usa solo uno spazio
     if note_input.strip():
-        note_complete = f"{feedback} | {note_input}"
+        note_complete = f"{feedback} {note_input}"
     else:
         note_complete = feedback
     
-    # Payload PULITO: Solo la data in formato GG/MM/AAAA, senza estensioni strane
     payload = {
         ENTRY_ID['data']: data_selezionata.strftime("%d/%m/%Y"),
         ENTRY_ID['posizione']: posizione,
