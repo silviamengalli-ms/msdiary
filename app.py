@@ -6,7 +6,7 @@ import requests
 # --- CONFIGURAZIONE INTERFACCIA ---
 st.set_page_config(page_title="MS Diary - Predizione", page_icon="📊", layout="centered")
 
-# --- ACCOPPIAMENTO GOOGLE (DATI REALI REINTEGRATI) ---
+# --- ACCOPPIAMENTO GOOGLE (DATI REALI) ---
 URL_MODULO = "https://docs.google.com/forms/d/e/1FAIpQLSfsNrtCcCMKrQ22pM-7NfrW7F9xWvtUSZPNBu83AgV9ZyWtDQ/formResponse"
 
 ENTRY_ID = {
@@ -27,13 +27,8 @@ URL_FOGLIO_CSV = "https://docs.google.com/spreadsheets/d/1eSnvfouOdaL-sakQgwKCIt
 PESI_SONNO = {"discreta": 0.0, "soddisfacente": 1.0, "scarsa": -1.5}
 PESI_PASSI = {"fino a 1000": 0.5, "da 1001 a 3000": 0.0, "oltre 3000": -0.5}
 PESI_ATTIVITA = {
-    "ufficio": -0.5, 
-    "lavoro da casa": -0.1, 
-    "piccole commissioni": -0.4, 
-    "visita": -0.5, 
-    "fisioterapia": -0.4, 
-    "riposo totale": 0.5, 
-    "sociale": -0.7
+    "ufficio": -0.5, "lavoro da casa": -0.1, "piccole commissioni": -0.4, 
+    "visita": -0.5, "fisioterapia": -0.4, "riposo totale": 0.5, "sociale": -0.7
 }
 
 def recupera_meteo_automatico(data_target):
@@ -60,6 +55,7 @@ with col2:
     dolore = st.slider("Dolore (1-10 - dato background):", 1, 10, 1)
 
 # --- CALCOLO PREDIZIONE ---
+st.markdown("---")
 st.subheader("🔮 Stato del Semaforo")
 
 if st.button("🔄 Calcola Predizione AI"):
@@ -75,59 +71,61 @@ if st.button("🔄 Calcola Predizione AI"):
         score -= 0.3 
         
     st.session_state['semaforo_predetto'] = round(max(1.0, min(10.0, score)), 1)
-    st.session_state['predizione_calcolata'] = True
 
-if st.session_state.get('predizione_calcolata', False):
-    valore = st.session_state['semaforo_predetto']
+# Recuperiamo il valore calcolato (default 5.0 se non ancora premuto il tasto)
+valore_calcolato = st.session_state.get('semaforo_predetto', 5.0)
+
+if valore_calcolato <= 5: 
+    st.error(f"Stato predetto: ROSSO (Valore calcolato: {valore_calcolato})")
+elif 6 <= valore_calcolato <= 8: 
+    st.warning(f"Stato predetto: GIALLO (Valore calcolato: {valore_calcolato})")
+else: 
+    st.success(f"Stato predetto: VERDE (Valore calcolato: {valore_calcolato})")
+
+# --- SEZIONE DIARIO / SERALE ---
+st.markdown("---")
+st.subheader("📝 Note & Validazione Serale")
+
+feedback = st.selectbox("Feedback sul predittore:", ["#Match", "#Overestimate", "#Underestimate"])
+
+st.info("""
+**🏷️ Tag suggeriti per le tue note:**
+* **#Sintomo:** (es. #sintomo: brainfog)
+* **#Farmaco:** (es. #farmaco: integratore)
+* **#Clima:** (es. #clima: umido)
+* **#AttivitàExtra:** (es. #attivitàextra: spesa)
+""")
+
+note_input = st.text_area("Descrivi la giornata usando i tag:")
+
+# --- INVIO DATI ---
+if st.button("💾 Registra Giornata Definitiva", type="primary"):
+    if note_input.strip():
+        note_complete = f"{feedback} | {note_input}"
+    else:
+        note_complete = feedback
     
-    if valore <= 5: 
-        st.error(f"Stato predetto: ROSSO (Valore: {valore})")
-    elif 6 <= valore <= 8: 
-        st.warning(f"Stato predetto: GIALLO (Valore: {valore})")
-    else: 
-        st.success(f"Stato predetto: VERDE (Valore: {valore})")
-
-    st.markdown("---")
-    st.subheader("📝 Note & Validazione Serale")
-    feedback = st.selectbox("Feedback sul predittore:", ["#Match", "#Overestimate", "#Underestimate"])
-
-    st.info("""
-    **🏷️ Tag suggeriti per le tue note:**
-    * **#Sintomo:** (es. formicolio, brainfog)
-    * **#Farmaco:** (es. antidolorifico, nuovo integratore)
-    * **#Clima:** (es. forte umidità, sbalzo barometrico)
-    * **#AttivitàExtra:** (es. cena con mia figlia, lavori per la caldaia)
-    * **#Umore:** (es. sereno, ansia, irritabile)
-    """)
+    payload = {
+        ENTRY_ID['posizione']: posizione,
+        ENTRY_ID['temp']: str(int(temp)),
+        ENTRY_ID['sonno']: sonno,
+        ENTRY_ID['energia']: str(energia),
+        ENTRY_ID['dolore']: str(dolore), 
+        # Arrotonda all'intero più vicino per il modulo Google
+        ENTRY_ID['semaforo']: str(int(round(valore_calcolato))),
+        ENTRY_ID['passi']: passi,
+        ENTRY_ID['note']: note_complete
+    }
     
-    note_input = st.text_area("Descrivi la giornata usando i tag:")
-
-    if st.button("💾 Registra Giornata Definitiva", type="primary"):
-        if note_input.strip():
-            note_complete = f"{feedback} | {note_input}"
-        else:
-            note_complete = feedback
-        
-        payload = {
-            ENTRY_ID['posizione']: posizione,
-            ENTRY_ID['temp']: str(int(temp)),
-            ENTRY_ID['sonno']: sonno,
-            ENTRY_ID['energia']: str(energia),
-            ENTRY_ID['dolore']: str(dolore), 
-            ENTRY_ID['semaforo']: str(int(round(valore))),
-            ENTRY_ID['passi']: passi,
-            ENTRY_ID['note']: note_complete
-        }
-        
-        payload_lista = list(payload.items())
-        for a in attivita:
-            payload_lista.append((ENTRY_ID['attivita'], a))
-        
-        try:
-            response = requests.post(URL_MODULO, data=payload_lista)
-            if response.status_code == 200: 
-                st.success("🎉 Registrazione riuscita!")
-            else: 
-                st.error(f"Errore {response.status_code}: Il modulo non ha accettato i dati. Controlla gli Entry ID.")
-        except Exception as e:
-            st.error(f"Errore connessione: {e}")
+    payload_lista = list(payload.items())
+    for a in attivita:
+        payload_lista.append((ENTRY_ID['attivita'], a))
+    
+    try:
+        response = requests.post(URL_MODULO, data=payload_lista)
+        if response.status_code == 200: 
+            st.success("🎉 Registrazione riuscita con successo!")
+        else: 
+            st.error(f"Errore {response.status_code}: Il modulo ha rifiutato i dati. Controlla la corrispondenza dei campi.")
+    except Exception as e:
+        st.error(f"Errore connessione: {e}")
