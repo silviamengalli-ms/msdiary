@@ -3,7 +3,7 @@ import datetime
 import requests
 
 # --- CONFIGURAZIONE ---
-st.set_page_config(page_title="MS Diary - Completo", layout="centered")
+st.set_page_config(page_title="MS Diary - Predittore Matematico", layout="centered")
 
 URL_MODULO = "https://docs.google.com/forms/d/e/1FAIpQLSfsNrtCcCMKrQ22pM-7NfrW7F9xWvtUSZPNBu83AgV9ZyWtDQ/formResponse"
 
@@ -20,22 +20,30 @@ ENTRY_ID = {
     'note': 'entry.158362423'
 }
 
+# Pesi verificati dal tuo link (tutti minuscoli)
 PESI_SONNO = {"discreta": 0.0, "soddisfacente": 1.0, "scarsa": -1.5}
 PESI_PASSI = {"fino a 1000": 0.5, "da 1001 a 3000": 0.0, "oltre i 3000": -0.5}
 PESI_ATTIVITA = {
-    "ufficio": -0.5, "lavoro da casa": -0.1, "piccole commissioni": -0.4, 
-    "visita": -0.5, "fisioterapia": -0.4, "riposo totale": 0.5, "sociale": -0.7
+    "ufficio": -0.5, 
+    "lavoro da casa": -0.1, 
+    "piccole commissioni": -0.4, 
+    "visita": -0.5, 
+    "fisioterapia": -0.4, 
+    "riposo totale": 0.5, 
+    "sociale": -0.7
 }
 
 def recupera_meteo(data):
     try:
         data_str = data.strftime("%Y-%m-%d")
         url = f"https://api.open-meteo.com/v1/forecast?latitude=45.43&longitude=10.99&start_date={data_str}&end_date={data_str}&daily=temperature_2m_max&timezone=Europe/Rome"
-        return float(requests.get(url).json()['daily']['temperature_2m_max'][0])
-    except: return 20.0
+        resp = requests.get(url).json()
+        return float(resp['daily']['temperature_2m_max'][0])
+    except: 
+        return 20.0
 
 # --- INTERFACCIA ---
-st.title("📊 Diario MS")
+st.title("📊 Il Mio Diario & Predittore Energetico")
 
 col1, col2 = st.columns(2)
 with col1:
@@ -47,26 +55,26 @@ with col1:
 
 with col2:
     passi = st.selectbox("Passi:", list(PESI_PASSI.keys()))
-    # Qui PUOI selezionare tutte le attività che vuoi!
-    attivita = st.multiselect("Attività:", list(PESI_ATTIVITA.keys()))
+    # Qui PUOI selezionare più attività contemporaneamente
+    attivita = st.multiselect("Attività svolte:", list(PESI_ATTIVITA.keys()))
     dolore = st.slider("Dolore (1-10):", 1, 10, 1)
 
-note_input = st.text_area("Note:")
+note_input = st.text_area("Note aggiuntive:")
 
-# --- CALCOLO SEMAFORO (CON SOMMA DEI PESI) ---
-# Il sistema scorre tutte le attività scelte e ne somma i pesi!
+# --- CALCOLO SEMAFORO (SOMMATORIA DEI PESI) ---
+# Il sistema somma matematicamente i pesi di TUTTE le attività selezionate
 somma_pesi_attivita = sum([PESI_ATTIVITA[a] for a in attivita])
 score = 3.0 + (energia * 0.4) + PESI_SONNO[sonno] + PESI_PASSI[passi] + somma_pesi_attivita
 valore_sem = round(max(1.0, min(10.0, score)), 1)
 
-st.subheader("🔮 Semaforo Energetico")
-st.metric("Valore Calcolato:", valore_sem)
+st.subheader("🔮 Predizione per la Dottoressa")
+st.metric("Semaforo Energetico Calcolato:", valore_sem)
 
 # --- INVIO ---
 if st.button("💾 REGISTRA GIORNATA"):
-    # Convertiamo la lista di attività in una singola stringa (es: "ufficio, fisioterapia")
-    # Questo inganna Google e ci evita l'errore 400!
-    attivita_da_inviare = ", ".join(attivita) if attivita else "Nessuna"
+    # Prepariamo la stringa con tutte le attività da scrivere nelle Note
+    stringa_attivita_completa = ", ".join(attivita) if attivita else "Nessuna"
+    note_finali = f"[Attività svolte: {stringa_attivita_completa}] {note_input}".strip()
     
     payload = {
         ENTRY_ID['data']: data_sel.strftime("%Y-%m-%d"),
@@ -76,15 +84,19 @@ if st.button("💾 REGISTRA GIORNATA"):
         ENTRY_ID['energia']: str(energia),
         ENTRY_ID['passi']: passi,
         ENTRY_ID['dolore']: str(dolore),
-        ENTRY_ID['semaforo']: str(int(valore_sem)),
-        ENTRY_ID['note']: note_input,
-        ENTRY_ID['attivita']: attivita_da_inviare
+        ENTRY_ID['semaforo']: str(int(round(valore_sem))),
+        ENTRY_ID['note']: note_finali
     }
     
+    # Se hai selezionato almeno un'attività, inviamo la prima come valore principale 
+    # per soddisfare il menù a discesa di Google senza mandarlo in errore 400
+    if attivita:
+        payload[ENTRY_ID['attivita']] = attivita[0]
+        
     try:
         r = requests.post(URL_MODULO, data=payload)
         if r.status_code == 200:
-            st.success("✅ Dati inviati con successo! Nel file Google vedrai tutte le attività.")
+            st.success("✅ Giornata registrata con successo! La sommatoria dei pesi è stata applicata e i dati sono al sicuro.")
         else:
             st.error(f"❌ Errore HTTP {r.status_code}. Il server ha rifiutato la richiesta.")
     except Exception as e:
