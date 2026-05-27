@@ -34,7 +34,6 @@ PESI_ATTIVITA = {
 }
 
 # --- MEMORIA DI STATO ---
-# Serve a ricordare il valore del semaforo tra un clic e l'altro
 if 'valore_sem' not in st.session_state:
     st.session_state.valore_sem = None
 
@@ -69,22 +68,29 @@ st.markdown("---")
 
 # --- PULSANTE CALCOLA PREDIZIONE ---
 if st.button("🔮 CALCOLA PREDIZIONE", use_container_width=True):
-    # Esegue la sommatoria matematica di TUTTI i pesi scelti
     somma_pesi_attivita = sum([PESI_ATTIVITA[a] for a in attivita])
     score = 3.0 + (energia * 0.4) + PESI_SONNO[sonno] + PESI_PASSI[passi] + somma_pesi_attivita
-    # Salva il risultato nella memoria dell'app
     st.session_state.valore_sem = round(max(1.0, min(10.0, score)), 1)
 
-# Mostra il box del risultato solo se l'utente ha cliccato su Calcola
+# Mostra il box del risultato con il pallino colorato dinamico
 if st.session_state.valore_sem is not None:
     st.subheader("🔮 Predizione per la Dottoressa")
-    st.metric("Semaforo Energetico Calcolato:", st.session_state.valore_sem)
+    
+    # Logica di assegnazione del pallino colorato
+    if st.session_state.valore_sem <= 4.5:
+        pallino = "🔴"
+    elif st.session_state.valore_sem <= 7.0:
+        pallino = "🟡"
+    else:
+        pallino = "🟢"
+        
+    # Mostriamo il pallino direttamente nel testo della metrica
+    st.metric(label=f"{pallino} Semaforo Energetico Calcolato:", value=st.session_state.valore_sem)
 
 st.markdown("---")
 
 # --- PULSANTE INVIO ---
 if st.button("💾 REGISTRA GIORNATA", use_container_width=True):
-    # Controllo di sicurezza: l'utente deve aver calcolato il semaforo prima di inviare
     if st.session_state.valore_sem is None:
         st.error("⚠️ Attenzione: Devi prima cliccare su '🔮 CALCOLA PREDIZIONE' per generare il valore del Semaforo!")
     else:
@@ -110,7 +116,6 @@ if st.button("💾 REGISTRA GIORNATA", use_container_width=True):
             r = requests.post(URL_MODULO, data=payload)
             if r.status_code == 200:
                 st.success("✅ Giornata registrata con successo nel modulo Google!")
-                # Svuota la memoria del semaforo per la compilazione successiva
                 st.session_state.valore_sem = None
             else:
                 st.error(f"❌ Errore HTTP {r.status_code}. Il server ha rifiutato la richiesta.")
