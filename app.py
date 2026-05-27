@@ -20,7 +20,7 @@ ENTRY_ID = {
     'note': 'entry.158362423'
 }
 
-# Pesi verificati dal tuo link (tutti minuscoli)
+# Pesi matematici
 PESI_SONNO = {"discreta": 0.0, "soddisfacente": 1.0, "scarsa": -1.5}
 PESI_PASSI = {"fino a 1000": 0.5, "da 1001 a 3000": 0.0, "oltre i 3000": -0.5}
 PESI_ATTIVITA = {
@@ -32,6 +32,11 @@ PESI_ATTIVITA = {
     "riposo totale": 0.5, 
     "sociale": -0.7
 }
+
+# --- MEMORIA DI STATO ---
+# Serve a ricordare il valore del semaforo tra un clic e l'altro
+if 'valore_sem' not in st.session_state:
+    st.session_state.valore_sem = None
 
 def recupera_meteo(data):
     try:
@@ -55,49 +60,59 @@ with col1:
 
 with col2:
     passi = st.selectbox("Passi:", list(PESI_PASSI.keys()))
-    # Qui PUOI selezionare più attività contemporaneamente
     attivita = st.multiselect("Attività svolte:", list(PESI_ATTIVITA.keys()))
     dolore = st.slider("Dolore (1-10):", 1, 10, 1)
 
-note_input = st.text_area("Note aggiuntive:")
+note_input = st.text_area("Note aggiuntive (usa pure i #sintomi):")
 
-# --- CALCOLO SEMAFORO (SOMMATORIA DEI PESI) ---
-# Il sistema somma matematicamente i pesi di TUTTE le attività selezionate
-somma_pesi_attivita = sum([PESI_ATTIVITA[a] for a in attivita])
-score = 3.0 + (energia * 0.4) + PESI_SONNO[sonno] + PESI_PASSI[passi] + somma_pesi_attivita
-valore_sem = round(max(1.0, min(10.0, score)), 1)
+st.markdown("---")
 
-st.subheader("🔮 Predizione per la Dottoressa")
-st.metric("Semaforo Energetico Calcolato:", valore_sem)
+# --- PULSANTE CALCOLA PREDIZIONE ---
+if st.button("🔮 CALCOLA PREDIZIONE", use_container_width=True):
+    # Esegue la sommatoria matematica di TUTTI i pesi scelti
+    somma_pesi_attivita = sum([PESI_ATTIVITA[a] for a in attivita])
+    score = 3.0 + (energia * 0.4) + PESI_SONNO[sonno] + PESI_PASSI[passi] + somma_pesi_attivita
+    # Salva il risultato nella memoria dell'app
+    st.session_state.valore_sem = round(max(1.0, min(10.0, score)), 1)
 
-# --- INVIO ---
-if st.button("💾 REGISTRA GIORNATA"):
-    # Prepariamo la stringa con tutte le attività da scrivere nelle Note
-    stringa_attivita_completa = ", ".join(attivita) if attivita else "Nessuna"
-    note_finali = f"[Attività svolte: {stringa_attivita_completa}] {note_input}".strip()
-    
-    payload = {
-        ENTRY_ID['data']: data_sel.strftime("%Y-%m-%d"),
-        ENTRY_ID['posizione']: posizione,
-        ENTRY_ID['temp']: str(int(temp)),
-        ENTRY_ID['sonno']: sonno,
-        ENTRY_ID['energia']: str(energia),
-        ENTRY_ID['passi']: passi,
-        ENTRY_ID['dolore']: str(dolore),
-        ENTRY_ID['semaforo']: str(int(round(valore_sem))),
-        ENTRY_ID['note']: note_finali
-    }
-    
-    # Se hai selezionato almeno un'attività, inviamo la prima come valore principale 
-    # per soddisfare il menù a discesa di Google senza mandarlo in errore 400
-    if attivita:
-        payload[ENTRY_ID['attivita']] = attivita[0]
+# Mostra il box del risultato solo se l'utente ha cliccato su Calcola
+if st.session_state.valore_sem is not None:
+    st.subheader("🔮 Predizione per la Dottoressa")
+    st.metric("Semaforo Energetico Calcolato:", st.session_state.valore_sem)
+
+st.markdown("---")
+
+# --- PULSANTE INVIO ---
+if st.button("💾 REGISTRA GIORNATA", use_container_width=True):
+    # Controllo di sicurezza: l'utente deve aver calcolato il semaforo prima di inviare
+    if st.session_state.valore_sem is None:
+        st.error("⚠️ Attenzione: Devi prima cliccare su '🔮 CALCOLA PREDIZIONE' per generare il valore del Semaforo!")
+    else:
+        stringa_attivita_completa = ", ".join(attivita) if attivita else "Nessuna"
+        note_finali = f"[Attività svolte: {stringa_attivita_completa}] {note_input}".strip()
         
-    try:
-        r = requests.post(URL_MODULO, data=payload)
-        if r.status_code == 200:
-            st.success("✅ Giornata registrata con successo! La sommatoria dei pesi è stata applicata e i dati sono al sicuro.")
-        else:
-            st.error(f"❌ Errore HTTP {r.status_code}. Il server ha rifiutato la richiesta.")
-    except Exception as e:
-        st.error(f"⚠️ Errore di connessione: {e}")
+        payload = {
+            ENTRY_ID['data']: data_sel.strftime("%Y-%m-%d"),
+            ENTRY_ID['posizione']: posizione,
+            ENTRY_ID['temp']: str(int(temp)),
+            ENTRY_ID['sonno']: sonno,
+            ENTRY_ID['energia']: str(energia),
+            ENTRY_ID['passi']: passi,
+            ENTRY_ID['dolore']: str(dolore),
+            ENTRY_ID['semaforo']: str(int(round(st.session_state.valore_sem))),
+            ENTRY_ID['note']: note_finali
+        }
+        
+        if attivita:
+            payload[ENTRY_ID['attivita']] = attivita[0]
+            
+        try:
+            r = requests.post(URL_MODULO, data=payload)
+            if r.status_code == 200:
+                st.success("✅ Giornata registrata con successo nel modulo Google!")
+                # Svuota la memoria del semaforo per la compilazione successiva
+                st.session_state.valore_sem = None
+            else:
+                st.error(f"❌ Errore HTTP {r.status_code}. Il server ha rifiutato la richiesta.")
+        except Exception as e:
+            st.error(f"⚠️ Errore di connessione: {e}")
