@@ -52,8 +52,6 @@ st.title("📊 Il Mio Diario & Predittore Energetico")
 col1, col2 = st.columns(2)
 with col1:
     data_sel = st.date_input("Data:", value=datetime.date.today(), format="DD-MM-YYYY")
-    st.caption(f"📅 Data selezionata: **{data_sel.strftime('%d/%m/%Y')}**")
-    
     posizione = st.text_input("Luogo:", value="Verona")
     temp = st.number_input("Temperatura (°C):", value=recupera_meteo(data_sel))
     sonno = st.selectbox("Sonno:", list(PESI_SONNO.keys()))
@@ -64,7 +62,7 @@ with col2:
     attivita = st.multiselect("Attività svolte:", list(PESI_ATTIVITA.keys()))
     dolore = st.slider("Dolore (1-10):", 1, 10, 1)
 
-# --- NUOVA SEZIONE: TAG SUGGERITI ---
+# --- TAG SUGGERITI ---
 st.markdown("💡 **Tag suggeriti per arricchire il diario:**")
 st.markdown("`#sintomi` &nbsp; `#clima` &nbsp; `#attivita_extra` &nbsp; `#umore`")
 
