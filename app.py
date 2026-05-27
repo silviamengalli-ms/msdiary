@@ -63,7 +63,7 @@ with col2:
     energia = st.slider("Energia (1-10):", 1, 10, 5)
 
 # --- TAG SUGGERITI ---
-st.markdown("💡 **Tag da utilizzzare nel campo "Note":**")
+st.markdown("💡 **Tag da utilizzare nel campo Note**")
 st.markdown("`#sintomi` &nbsp; `#clima` &nbsp; `#attivita_extra` &nbsp; `#umore`")
 
 note_input = st.text_area("Note aggiuntive:")
