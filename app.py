@@ -51,7 +51,9 @@ st.title("📊 Il Mio Diario & Predittore Energetico")
 
 col1, col2 = st.columns(2)
 with col1:
-    data_sel = st.date_input("Data:", value=datetime.date.today())
+    data_sel = st.date_input("Data:", value=datetime.date.today(), format="DD-MM-YYYY")
+    st.caption(f"📅 Data selezionata: **{data_sel.strftime('%d/%m/%Y')}**")
+    
     posizione = st.text_input("Luogo:", value="Verona")
     temp = st.number_input("Temperatura (°C):", value=recupera_meteo(data_sel))
     sonno = st.selectbox("Sonno:", list(PESI_SONNO.keys()))
@@ -62,7 +64,11 @@ with col2:
     attivita = st.multiselect("Attività svolte:", list(PESI_ATTIVITA.keys()))
     dolore = st.slider("Dolore (1-10):", 1, 10, 1)
 
-note_input = st.text_area("Note aggiuntive (usa pure i #sintomi):")
+# --- NUOVA SEZIONE: TAG SUGGERITI ---
+st.markdown("💡 **Tag suggeriti per arricchire il diario:**")
+st.markdown("`#sintomi` &nbsp; `#clima` &nbsp; `#attivita_extra` &nbsp; `#umore`")
+
+note_input = st.text_area("Note aggiuntive:")
 
 st.markdown("---")
 
@@ -74,17 +80,15 @@ if st.button("🔮 CALCOLA PREDIZIONE", use_container_width=True):
 
 # Mostra il box del risultato con il pallino colorato dinamico
 if st.session_state.valore_sem is not None:
-    st.subheader("🔮 Calcola la predizione per oggi")
+    st.subheader("🔮 Predizione per la Dottoressa")
     
-    # Logica di assegnazione del pallino colorato
-    if st.session_state.valore_sem <= 5.0:
+    if st.session_state.valore_sem <= 4.5:
         pallino = "🔴"
     elif st.session_state.valore_sem <= 7.0:
         pallino = "🟡"
     else:
         pallino = "🟢"
         
-    # Mostriamo il pallino direttamente nel testo della metrica
     st.metric(label=f"{pallino} Semaforo Energetico Calcolato:", value=st.session_state.valore_sem)
 
 st.markdown("---")
@@ -98,7 +102,7 @@ if st.button("💾 REGISTRA GIORNATA", use_container_width=True):
         note_finali = f"[Attività svolte: {stringa_attivita_completa}] {note_input}".strip()
         
         payload = {
-            ENTRY_ID['data']: data_sel.strftime("%Y-%m-%d"),
+            ENTRY_ID['data']: data_sel.strftime("%d/%m/%Y"),
             ENTRY_ID['posizione']: posizione,
             ENTRY_ID['temp']: str(int(temp)),
             ENTRY_ID['sonno']: sonno,
