@@ -71,14 +71,13 @@ note_input = st.text_area("Note:", label_visibility="collapsed", placeholder="Sc
 st.markdown("---")
 
 # --- PULSANTE CALCOLA PREDIZIONE ---
-if st.button("🔮 CALCOLA PREDIZIONE", use_container_width=True):
+if st.button("🔮 CALCOLA PREDIZIONE 🔮", use_container_width=True):
     somma_pesi_attivita = sum([PESI_ATTIVITA[a] for a in attivita])
     score = 3.0 + (energia * 0.4) + PESI_SONNO[sonno] + PESI_PASSI[passi] + somma_pesi_attivita
     st.session_state.valore_sem = round(max(1.0, min(10.0, score)), 1)
 
 # Mostra il box del risultato (ALLINEATO AL CENTRO)
 if st.session_state.valore_sem is not None:
-    st.markdown("<h3 style='text-align: center;'>🔮 Predizione giornaliera</h3>", unsafe_allow_html=True)
     
     # Logica dinamica per il testo del bollino
     if st.session_state.valore_sem <= 4.5:
