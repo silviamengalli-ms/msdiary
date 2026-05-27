@@ -59,14 +59,15 @@ with col1:
 with col2:
     passi = st.selectbox("Passi:", list(PESI_PASSI.keys()))
     attivita = st.multiselect("Attività svolte:", list(PESI_ATTIVITA.keys()))
-    dolore = st.slider("Dolore (1-10):", 1, 10, 1)
     energia = st.slider("Energia (1-10):", 1, 10, 5)
+    dolore = st.slider("Dolore (1-10):", 1, 10, 1)
 
-# --- TAG SUGGERITI ---
-st.markdown("💡 **Tag da utilizzare nel campo Note**")
+# --- SEZIONE NOTE NUOVA E PULITA ---
+st.markdown("### 💡 Note 💡")
 st.markdown("`#sintomi` &nbsp; `#clima` &nbsp; `#attivita_extra` &nbsp; `#umore`")
 
-note_input = st.text_area("Note aggiuntive:")
+# label_visibility="collapsed" nasconde la scritta standard "Note aggiuntive" sopra il box
+note_input = st.text_area("Note:", label_visibility="collapsed", placeholder="Scrivi qui le tue annotazioni della giornata...")
 
 st.markdown("---")
 
