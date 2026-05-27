@@ -90,8 +90,8 @@ if st.session_state.valore_sem is not None:
         pallino = "🟢"
         testo_bollino = "BOLLINO VERDE"
         
-    # Visualizzazione in un'unica riga con lo stesso identico stile e dimensione del carattere
-    st.markdown(f"#### {pallino} {testo_bollino}: {st.session_state.valore_sem}")
+    # Testo rimpicciolito usando il grassetto standard (stessa dimensione del font di base)
+    st.markdown(f"**{pallino} {testo_bollino}: {st.session_state.valore_sem}**")
 
 st.markdown("---")
 
