@@ -55,15 +55,15 @@ with col1:
     posizione = st.text_input("Luogo:", value="Verona")
     temp = st.number_input("Temperatura (°C):", value=recupera_meteo(data_sel))
     sonno = st.selectbox("Sonno:", list(PESI_SONNO.keys()))
-    energia = st.slider("Energia (1-10):", 1, 10, 5)
 
 with col2:
     passi = st.selectbox("Passi:", list(PESI_PASSI.keys()))
     attivita = st.multiselect("Attività svolte:", list(PESI_ATTIVITA.keys()))
     dolore = st.slider("Dolore (1-10):", 1, 10, 1)
+    energia = st.slider("Energia (1-10):", 1, 10, 5)
 
 # --- TAG SUGGERITI ---
-st.markdown("💡 **Tag suggeriti per arricchire il diario:**")
+st.markdown("💡 **Tag da utilizzzare nel campo "Note":**")
 st.markdown("`#sintomi` &nbsp; `#clima` &nbsp; `#attivita_extra` &nbsp; `#umore`")
 
 note_input = st.text_area("Note aggiuntive:")
@@ -78,7 +78,7 @@ if st.button("🔮 CALCOLA PREDIZIONE", use_container_width=True):
 
 # Mostra il box del risultato con il pallino colorato dinamico
 if st.session_state.valore_sem is not None:
-    st.subheader("🔮 Predizione per la Dottoressa")
+    st.subheader("🔮 Predizione giornaliera")
     
     if st.session_state.valore_sem <= 4.5:
         pallino = "🔴"
