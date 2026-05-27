@@ -90,8 +90,8 @@ if st.session_state.valore_sem is not None:
         pallino = "🟢"
         testo_bollino = "BOLLINO VERDE"
         
-    # Testo con dimensione standard (corpo piccolo) e centrato
-    st.markdown(f"<p style='text-align: center; font-weight: bold;'>{pallino} {testo_bollino}: {st.session_state.valore_sem}</p>", unsafe_allow_html=True)
+    # Testo con la nuova struttura richiesta, corpo piccolo e centrato
+    st.markdown(f"<p style='text-align: center; font-weight: bold;'>{pallino} {st.session_state.valore_sem} - {testo_bollino} {pallino}</p>", unsafe_allow_html=True)
 
 st.markdown("---")
 
