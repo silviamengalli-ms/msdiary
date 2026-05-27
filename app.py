@@ -47,7 +47,9 @@ def recupera_meteo(data):
         return 20.0
 
 # --- INTERFACCIA ---
-st.title("📊 Il Mio Diario & Predittore Energetico")
+# Titolo più piccolo (st.header) e icona più intuitiva (🔋)
+st.header("🔋 Il Mio Diario & Predittore Energetico")
+st.markdown("##") # Un piccolo spazio per respirare prima delle colonne
 
 col1, col2 = st.columns(2)
 with col1:
@@ -90,7 +92,7 @@ if st.session_state.valore_sem is not None:
         pallino = "🟢"
         testo_bollino = "BOLLINO VERDE"
         
-    # Testo con la nuova struttura richiesta, corpo piccolo e centrato
+    # Testo con la struttura richiesta, corpo piccolo e centrato
     st.markdown(f"<p style='text-align: center; font-weight: bold;'>{pallino} {st.session_state.valore_sem} - {testo_bollino} {pallino}</p>", unsafe_allow_html=True)
 
 st.markdown("---")
