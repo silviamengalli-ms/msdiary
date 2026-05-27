@@ -62,9 +62,10 @@ with col2:
     energia = st.slider("Energia (1-10):", 1, 10, 5)
     dolore = st.slider("Dolore (1-10):", 1, 10, 1)
 
-# --- SEZIONE NOTE ---
-st.markdown("### 💡 Note 💡")
-st.markdown("`#sintomi` &nbsp; `#clima` &nbsp; `#attivita_extra` &nbsp; `#umore`")
+# --- SEZIONE NOTE (ALLINEATA AL CENTRO) ---
+st.markdown("<h3 style='text-align: center;'>💡 Note 💡</h3>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;'><code>#sintomi</code> &nbsp; <code>#clima</code> &nbsp; <code>#attivita_extra</code> &nbsp; <code>#umore</code></p>", unsafe_allow_html=True)
+
 note_input = st.text_area("Note:", label_visibility="collapsed", placeholder="Scrivi qui le tue annotazioni della giornata...")
 
 st.markdown("---")
@@ -75,9 +76,9 @@ if st.button("🔮 CALCOLA PREDIZIONE", use_container_width=True):
     score = 3.0 + (energia * 0.4) + PESI_SONNO[sonno] + PESI_PASSI[passi] + somma_pesi_attivita
     st.session_state.valore_sem = round(max(1.0, min(10.0, score)), 1)
 
-# Mostra il box del risultato personalizzato sulla stessa riga
+# Mostra il box del risultato (ALLINEATO AL CENTRO)
 if st.session_state.valore_sem is not None:
-    st.subheader("🔮 Predizione giornaliera")
+    st.markdown("<h3 style='text-align: center;'>🔮 Predizione giornaliera</h3>", unsafe_allow_html=True)
     
     # Logica dinamica per il testo del bollino
     if st.session_state.valore_sem <= 4.5:
@@ -90,8 +91,8 @@ if st.session_state.valore_sem is not None:
         pallino = "🟢"
         testo_bollino = "BOLLINO VERDE"
         
-    # Testo rimpicciolito usando il grassetto standard (stessa dimensione del font di base)
-    st.markdown(f"**{pallino} {testo_bollino}: {st.session_state.valore_sem}**")
+    # Testo con dimensione standard (corpo piccolo) e centrato
+    st.markdown(f"<p style='text-align: center; font-weight: bold;'>{pallino} {testo_bollino}: {st.session_state.valore_sem}</p>", unsafe_allow_html=True)
 
 st.markdown("---")
 
