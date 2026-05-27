@@ -62,11 +62,9 @@ with col2:
     energia = st.slider("Energia (1-10):", 1, 10, 5)
     dolore = st.slider("Dolore (1-10):", 1, 10, 1)
 
-# --- SEZIONE NOTE NUOVA E PULITA ---
+# --- SEZIONE NOTE ---
 st.markdown("### 💡 Note 💡")
 st.markdown("`#sintomi` &nbsp; `#clima` &nbsp; `#attivita_extra` &nbsp; `#umore`")
-
-# label_visibility="collapsed" nasconde la scritta standard "Note aggiuntive" sopra il box
 note_input = st.text_area("Note:", label_visibility="collapsed", placeholder="Scrivi qui le tue annotazioni della giornata...")
 
 st.markdown("---")
@@ -77,18 +75,23 @@ if st.button("🔮 CALCOLA PREDIZIONE", use_container_width=True):
     score = 3.0 + (energia * 0.4) + PESI_SONNO[sonno] + PESI_PASSI[passi] + somma_pesi_attivita
     st.session_state.valore_sem = round(max(1.0, min(10.0, score)), 1)
 
-# Mostra il box del risultato con il pallino colorato dinamico
+# Mostra il box del risultato personalizzato sulla stessa riga
 if st.session_state.valore_sem is not None:
     st.subheader("🔮 Predizione giornaliera")
     
+    # Logica dinamica per il testo del bollino
     if st.session_state.valore_sem <= 4.5:
         pallino = "🔴"
+        testo_bollino = "BOLLINO ROSSO"
     elif st.session_state.valore_sem <= 7.0:
         pallino = "🟡"
+        testo_bollino = "BOLLINO GIALLO"
     else:
         pallino = "🟢"
+        testo_bollino = "BOLLINO VERDE"
         
-    st.metric(label=f"{pallino} Semaforo Energetico Calcolato:", value=st.session_state.valore_sem)
+    # Visualizzazione in un'unica riga con lo stesso identico stile e dimensione del carattere
+    st.markdown(f"#### {pallino} {testo_bollino}: {st.session_state.valore_sem}")
 
 st.markdown("---")
 
