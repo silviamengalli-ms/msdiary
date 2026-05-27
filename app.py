@@ -74,10 +74,10 @@ if st.button("🔮 CALCOLA PREDIZIONE", use_container_width=True):
 
 # Mostra il box del risultato con il pallino colorato dinamico
 if st.session_state.valore_sem is not None:
-    st.subheader("🔮 Predizione per la Dottoressa")
+    st.subheader("🔮 Calcola la predizione per oggi")
     
     # Logica di assegnazione del pallino colorato
-    if st.session_state.valore_sem <= 4.5:
+    if st.session_state.valore_sem <= 5.0:
         pallino = "🔴"
     elif st.session_state.valore_sem <= 7.0:
         pallino = "🟡"
