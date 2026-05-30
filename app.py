@@ -51,7 +51,7 @@ def recupera_meteo(data):
         return 20.0
 
 # --- INTERFACCIA PRINCIPALE ---
-st.header("🔋 La Mia Carica")
+st.header("🔋 La Mia Carica - sviluppo")
 st.markdown("##")
 
 # Creazione dei due Tab
