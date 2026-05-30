@@ -40,9 +40,9 @@ def recupera_meteo(data):
 # --- INTERFACCIA ---
 st.title("🔋 La Mia Carica")
 st.markdown("---")
-st.markdown("Ciao! Pianifica la tua giornata e scopri come si prospetta la tua energia. 😊")
+st.markdown("Ciao! Come ti senti stamattina..? facciamo un piccolo check 😊")
 
-tab_mattina, tab_sera = st.tabs(["🌅 Pianifica la Mattina", "🌌 Feedback Serale"])
+tab_mattina, tab_sera = st.tabs(["🌅 Diamo un'occhiata alle attività in programma", "🌌 Vediamo un po' com'è andata oggi"])
 
 # Variabile per il calcolo salvato
 if 'valore_sem' not in st.session_state:
@@ -106,7 +106,7 @@ with tab_sera:
             r = requests.post(URL_MODULO, data=payload)
             if r.status_code == 200:
                 st.balloons()
-                st.success("Dati registrati con successo! 🌟")
+                st.success("Anche oggi ce l'hai fatta e abbiamo registrato i dati con successo! 🌟")
             else:
                 st.error("Errore nel salvataggio.")
         except Exception as e:
