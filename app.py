@@ -67,19 +67,4 @@ with tab_mattina:
     # --- CALCOLO RICALIBRATO ---
     somma_pesi_attivita = sum([PESI_ATTIVITA[a] for a in attivita])
     
-    if temp <= 28.0:
-        peso_temperatura = 0.0
-    elif 28.0 < temp <= 30.0:
-        peso_temperatura = -0.5
-    else:
-        peso_temperatura = -1.0 - ((temp - 30.0) * 0.1)
-    
-    # Formula: Base 5.0 + Energia (0.3) + Fattori
-    score = 5.0 + (energia * 0.3) + PESI_SONNO[sonno] + PESI_PASSI[passi] + somma_pesi_attivita + peso_temperatura
-    valore_sem = round(max(1.0, min(10.0, score)), 1)
-    st.session_state.valore_sem = valore_sem
-
-    # Visualizzazione Bollino
-    if valore_sem <= 4.5:
-        st.error(f"🔴 BOLLINO ROSSO: {valore_sem}")
-    elif valore_sem <= 7.0:
+    if temp <= 28.
