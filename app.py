@@ -39,6 +39,8 @@ PESI_ATTIVITA = {
 if 'valore_sem' not in st.session_state:
     st.session_state.valore_sem = None
 
+# Caching per far sì che l'API non rallenti l'app a ogni mossa
+@st.cache_data(ttl=3600)
 def recupera_meteo(data):
     try:
         data_str = data.strftime("%Y-%m-%d")
@@ -52,7 +54,7 @@ def recupera_meteo(data):
 st.header("🔋 La Mia Carica")
 st.markdown("##")
 
-# Creazione dei due Tab per la scansione temporale della giornata
+# Creazione dei due Tab
 tab_mattina, tab_sera = st.tabs(["🌅 Mattina: Fase Previsionale", "🌌 Sera: Feedback & Registro"])
 
 # --- TAB 1: MATTINA ---
@@ -65,7 +67,11 @@ with tab_mattina:
     with col1:
         data_sel = st.date_input("Seleziona la data di oggi:", value=datetime.date.today(), format="DD-MM-YYYY")
         posizione = st.text_input("Dove ti trovi? (Luogo):", value="Verona")
-        temp = st.number_input("Temperatura massima prevista per oggi (°C):", value=recupera_meteo(data_sel))
+        
+        # Recupero del meteo e inserimento dentro uno Slider per azzerare i bug di inserimento manuale
+        temp_meteo = recupera_meteo(data_sel)
+        temp = st.slider("Temperatura prevista oggi (°C):", min_value=-5.0, max_value=45.0, value=float(temp_meteo), step=0.5)
+        
         sonno = st.selectbox("Qualità del sonno dell'ultima notte:", list(PESI_SONNO.keys()))
 
     with col2:
@@ -75,37 +81,38 @@ with tab_mattina:
 
     st.markdown("---")
     
-    if st.button("🔮 CALCOLA PREDIZIONE 🔮", use_container_width=True):
-        somma_pesi_attivita = sum([PESI_ATTIVITA[a] for a in attivita])
+    # --- CALCOLO REATTIVO IN TEMPO REALE ---
+    somma_pesi_attivita = sum([PESI_ATTIVITA[a] for a in attivita])
+    
+    if temp <= 28.0:
+        peso_temperatura = 0.0     
+    elif 28.0 < temp <= 30.0:
+        peso_temperatura = -0.5    
+    else:
+        gradi_extra = temp - 30.0
+        peso_temperatura = -1.0 - (gradi_extra * 0.1)
         
-        # --- 🌡️ CALCOLO PROGRESSIVO DEL PESO DELLA TEMPERATURA ---
-        if temp <= 28.0:
-            peso_temperatura = 0.0     # Verde: nessun impatto
-        elif 28.0 < temp <= 30.0:
-            peso_temperatura = -0.5    # Giallo: impatto moderato
-        else:
-            # Rosso: calcolo progressivo oltre i 30°C
-            # Parte da -1.0 e toglie altri 0.1 per ogni grado extra (es. a 45°C toglierà -2.5)
-            gradi_extra = temp - 30.0
-            peso_temperatura = -1.0 - (gradi_extra * 0.1)
-            
-        # Calcolo dello score finale includendo il peso progressivo della temperatura
-        score = 3.0 + (energia * 0.4) + PESI_SONNO[sonno] + PESI_PASSI[passi] + somma_pesi_attivita + peso_temperatura
-        st.session_state.valore_sem = round(max(1.0, min(10.0, score)), 1)
+    score = 3.0 + (energia * 0.4) + PESI_SONNO[sonno] + PESI_PASSI[passi] + somma_pesi_attivita + peso_temperatura
+    st.session_state.valore_sem = round(max(1.0, min(10.0, score)), 1)
 
-    if st.session_state.valore_sem is not None:
-        if st.session_state.valore_sem <= 4.5:
-            pallino = "🔴"
-            testo_bollino = "BOLLINO ROSSO"
-        elif st.session_state.valore_sem <= 7.0:
-            pallino = "🟡"
-            testo_bollino = "BOLLINO GIALLO"
-        else:
-            pallino = "🟢"
-            testo_bollino = "BOLLINO VERDE"
-            
-        st.markdown(f"<p style='text-align: center; font-weight: bold;'>{pallino} {st.session_state.valore_sem} - {testo_bollino} {pallino}</p>", unsafe_allow_html=True)
-        st.info("💡 Ora puoi passare alla scheda della **Sera** quando vuoi per aggiungere le note e registrare la giornata!")
+    # --- MOSTRA IL RISULTATO IN DIRETTA ---
+    if st.session_state.valore_sem <= 4.5:
+        pallino = "🔴"
+        testo_bollino = "BOLLINO ROSSO"
+    elif st.session_state.valore_sem <= 7.0:
+        pallino = "🟡"
+        testo_bollino = "BOLLINO GIALLO"
+    else:
+        pallino = "🟢"
+        testo_bollino = "BOLLINO VERDE"
+        
+    st.markdown(f"<p style='text-align: center; font-size: 22px; font-weight: bold;'>{pallino} {st.session_state.valore_sem} - {testo_bollino} {pallino}</p>", unsafe_allow_html=True)
+    
+    # Questo piccolo testo ti proverà visivamente che la temperatura sta agendo
+    if peso_temperatura < 0:
+        st.markdown(f"<p style='text-align: center; color: gray; font-size: 14px;'><i>(Penalità caldo applicata: {round(peso_temperatura, 2)} punti)</i></p>", unsafe_allow_html=True)
+        
+    st.info("💡 Ora puoi passare alla scheda della **Sera** quando vuoi per aggiungere le note e registrare la giornata!")
 
 
 # --- TAB 2: SERA ---
@@ -134,7 +141,7 @@ with tab_sera:
 
     if st.button("💾 REGISTRA GIORNATA", use_container_width=True):
         if st.session_state.valore_sem is None:
-            st.error("⚠️ Attenzione: Devi prima calcolare il valore del Semaforo nella scheda '🌅 Mattina' prima di poter registrare!")
+            st.error("⚠️ Attenzione: Verifica che il punteggio nella scheda Mattina sia calcolato!")
         else:
             stringa_attivita_completa = ", ".join(attivita) if attivita else "Nessuna"
             note_finali = f"[Attività svolte: {stringa_attivita_completa}] {note_input}".strip()
@@ -163,7 +170,6 @@ with tab_sera:
                 r = requests.post(URL_MODULO, data=payload)
                 if r.status_code == 200:
                     st.success("✅ Splendido! La tua giornata è stata registrata con successo.")
-                    st.session_state.valore_sem = None
                 else:
                     st.error(f"❌ Errore HTTP {r.status_code}. Il server ha rifiutato la richiesta.")
             except Exception as e:
