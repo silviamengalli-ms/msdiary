@@ -5,7 +5,7 @@ from datetime import datetime
 # ==============================================================================
 # 1. CONFIGURAZIONE AMBIENTE DI TEST (Branch Sviluppo)
 # ==============================================================================
-URL_MODULO = "https://docs.google.com/forms/d/1kbo8bt9PRvHaYk3cMZ2HPsAOpUeSAoKWrpPonwVv3H8/formResponse"
+URL_MODULO = "https://docs.google.com/forms/d/e/1FAIpQLSdtqnrzl71uqLgb1-wY5yw3R2vo7m8-nSwGgNf7ZtbrchqlYw/formResponse"
 
 ENTRY_IDS = {
     "data": "entry.2022449610",
