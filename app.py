@@ -5,7 +5,7 @@ import requests
 # --- CONFIGURAZIONE ---
 st.set_page_config(page_title="La Mia Carica - Diario Energetico", layout="centered")
 
-# Aggiornato con l'URL del tuo NUOVO modulo
+# URL del tuo Google Modulo di test
 URL_MODULO = "https://docs.google.com/forms/d/e/1FAIpQLSdtqnrzl71uqLgb1-wY5yw3R2vo7m8-nSwGgNf7ZtbrchqlYw/formResponse"
 
 ENTRY_ID = {
@@ -78,15 +78,18 @@ with tab_mattina:
     if st.button("🔮 CALCOLA PREDIZIONE 🔮", use_container_width=True):
         somma_pesi_attivita = sum([PESI_ATTIVITA[a] for a in attivita])
         
-        # --- 🌡️ SISTEMAZIONE PESO RELATIVO ALLA TEMPERATURA ---
+        # --- 🌡️ CALCOLO PROGRESSIVO DEL PESO DELLA TEMPERATURA ---
         if temp <= 28.0:
-            peso_temperatura = 0.0     # Verde: fino a 28 gradi nessun impatto
+            peso_temperatura = 0.0     # Verde: nessun impatto
         elif 28.0 < temp <= 30.0:
-            peso_temperatura = -0.5    # Giallo: dai 28 ai 30 gradi toglie 0.5
+            peso_temperatura = -0.5    # Giallo: impatto moderato
         else:
-            peso_temperatura = -1.0    # Rosso: oltre i 30 gradi toglie 1.0
+            # Rosso: calcolo progressivo oltre i 30°C
+            # Parte da -1.0 e toglie altri 0.1 per ogni grado extra (es. a 45°C toglierà -2.5)
+            gradi_extra = temp - 30.0
+            peso_temperatura = -1.0 - (gradi_extra * 0.1)
             
-        # Calcolo finale con l'impatto della temperatura
+        # Calcolo dello score finale includendo il peso progressivo della temperatura
         score = 3.0 + (energia * 0.4) + PESI_SONNO[sonno] + PESI_PASSI[passi] + somma_pesi_attivita + peso_temperatura
         st.session_state.valore_sem = round(max(1.0, min(10.0, score)), 1)
 
