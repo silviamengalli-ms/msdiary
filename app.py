@@ -19,7 +19,7 @@ ENTRY_ID = {
     'dolore': 'entry.672372933',
     'passi': 'entry.28384771',
     'note': 'entry.158362423',
-    'valutazione_predizione': 'entry.375319797'  # <-- SISTEMATO: Inserito l'ID reale del modulo
+    'valutazione_predizione': 'entry.375319797'
 }
 
 # Pesi matematici
@@ -79,16 +79,14 @@ with tab_mattina:
         somma_pesi_attivita = sum([PESI_ATTIVITA[a] for a in attivita])
         
         # --- 🌡️ SISTEMAZIONE PESO RELATIVO ALLA TEMPERATURA ---
-        # Qui puoi definire come la temperatura influenza lo score.
-        # Ad esempio: se fa troppo caldo (sopra i 28 gradi) toglie energia, altrimenti è neutro.
-        if temp > 28.0:
-            peso_temperatura = -0.8  # Modifica questo valore in base a quanto incide il caldo
-        elif temp < 12.0:
-            peso_temperatura = -0.3  # Eventuale penalità per il freddo intenso
+        if temp <= 28.0:
+            peso_temperatura = 0.0     # Verde: fino a 28 gradi nessun impatto
+        elif 28.0 < temp <= 30.0:
+            peso_temperatura = -0.5    # Giallo: dai 28 ai 30 gradi toglie 0.5
         else:
-            peso_temperatura = 0.0   # Clima ideale, nessun impatto
+            peso_temperatura = -1.0    # Rosso: oltre i 30 gradi toglie 1.0
             
-        # Aggiunto '+ peso_temperatura' in fondo al calcolo dello score
+        # Calcolo finale con l'impatto della temperatura
         score = 3.0 + (energia * 0.4) + PESI_SONNO[sonno] + PESI_PASSI[passi] + somma_pesi_attivita + peso_temperatura
         st.session_state.valore_sem = round(max(1.0, min(10.0, score)), 1)
 
