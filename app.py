@@ -3,7 +3,7 @@ import datetime
 import requests
 
 # --- CONFIGURAZIONE ---
-st.set_page_config(page_title="MS Diary - Predittore Matematico", layout="centered")
+st.set_page_config(page_title="La Mia Carica - Diario Energetico", layout="centered")
 
 URL_MODULO = "https://docs.google.com/forms/d/e/1FAIpQLSfsNrtCcCMKrQ22pM-7NfrW7F9xWvtUSZPNBu83AgV9ZyWtDQ/formResponse"
 
@@ -17,7 +17,8 @@ ENTRY_ID = {
     'semaforo': 'entry.625659299',
     'dolore': 'entry.672372933',
     'passi': 'entry.28384771',
-    'note': 'entry.158362423'
+    'note': 'entry.158362423',
+    'valutazione_predizione': 'entry.0000000000'  # <-- NUOVO: Sostituisci con l'ID reale del tuo modulo
 }
 
 # Pesi matematici
@@ -46,86 +47,112 @@ def recupera_meteo(data):
     except: 
         return 20.0
 
-# --- INTERFACCIA ---
-# Titolo più piccolo (st.header) e icona più intuitiva (🔋)
-st.header("🔋 Il Mio Diario & Predittore Energetico")
-st.markdown("##") # Un piccolo spazio per respirare prima delle colonne
+# --- INTERFACCIA PRINCIPALE ---
+st.header("🔋 La Mia Carica")
+st.markdown("##")
 
-col1, col2 = st.columns(2)
-with col1:
-    data_sel = st.date_input("Data:", value=datetime.date.today(), format="DD-MM-YYYY")
-    posizione = st.text_input("Luogo:", value="Verona")
-    temp = st.number_input("Temperatura (°C):", value=recupera_meteo(data_sel))
-    sonno = st.selectbox("Sonno:", list(PESI_SONNO.keys()))
+# Creazione dei due Tab per la scansione temporale della giornata
+tab_mattina, tab_sera = st.tabs(["🌅 Mattina: Fase Previsionale", "🌌 Sera: Feedback & Registro"])
 
-with col2:
-    passi = st.selectbox("Passi:", list(PESI_PASSI.keys()))
-    attivita = st.multiselect("Attività svolte:", list(PESI_ATTIVITA.keys()))
-    energia = st.slider("Energia (1-10):", 1, 10, 5)
-    dolore = st.slider("Dolore (1-10):", 1, 10, 1)
-
-# --- SEZIONE NOTE (ALLINEATA AL CENTRO) ---
-st.markdown("<h3 style='text-align: center;'>💡 Note 💡</h3>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;'><code>#sintomi</code> &nbsp; <code>#clima</code> &nbsp; <code>#attivita_extra</code> &nbsp; <code>#umore</code></p>", unsafe_allow_html=True)
-
-note_input = st.text_area("Note:", label_visibility="collapsed", placeholder="Scrivi qui le tue annotazioni della giornata...")
-
-st.markdown("---")
-
-# --- PULSANTE CALCOLA PREDIZIONE ---
-if st.button("🔮 CALCOLA PREDIZIONE 🔮", use_container_width=True):
-    somma_pesi_attivita = sum([PESI_ATTIVITA[a] for a in attivita])
-    score = 3.0 + (energia * 0.4) + PESI_SONNO[sonno] + PESI_PASSI[passi] + somma_pesi_attivita
-    st.session_state.valore_sem = round(max(1.0, min(10.0, score)), 1)
-
-# Mostra il box del risultato (ALLINEATO AL CENTRO)
-if st.session_state.valore_sem is not None:
+# --- TAB 1: MATTINA ---
+with tab_mattina:
+    st.markdown("#### *Buongiorno! Come ti senti stamattina?* 😊")
+    st.markdown("Pianifichiamo la giornata e calcoliamo il tuo indice energetico previsto.")
+    st.markdown("---")
     
-    # Logica dinamica per il testo del bollino
-    if st.session_state.valore_sem <= 4.5:
-        pallino = "🔴"
-        testo_bollino = "BOLLINO ROSSO"
-    elif st.session_state.valore_sem <= 7.0:
-        pallino = "🟡"
-        testo_bollino = "BOLLINO GIALLO"
-    else:
-        pallino = "🟢"
-        testo_bollino = "BOLLINO VERDE"
-        
-    # Testo con la struttura richiesta, corpo piccolo e centrato
-    st.markdown(f"<p style='text-align: center; font-weight: bold;'>{pallino} {st.session_state.valore_sem} - {testo_bollino} {pallino}</p>", unsafe_allow_html=True)
+    col1, col2 = st.columns(2)
+    with col1:
+        data_sel = st.date_input("Seleziona la data di oggi:", value=datetime.date.today(), format="DD-MM-YYYY")
+        posizione = st.text_input("Dove ti trovi? (Luogo):", value="Verona")
+        temp = st.number_input("Temperatura massima prevista per oggi (°C):", value=recupera_meteo(data_sel))
+        sonno = st.selectbox("Qualità del sonno dell'ultima notte:", list(PESI_SONNO.keys()))
 
-st.markdown("---")
+    with col2:
+        passi = st.selectbox("Quanti passi pensi di fare oggi?:", list(PESI_PASSI.keys()))
+        attivita = st.multiselect("Attività in programma per oggi:", list(PESI_ATTIVITA.keys()))
+        energia = st.slider("Energia al risveglio (1-10):", 1, 10, 5)
 
-# --- PULSANTE INVIO ---
-if st.button("💾 REGISTRA GIORNATA", use_container_width=True):
-    if st.session_state.valore_sem is None:
-        st.error("⚠️ Attenzione: Devi prima cliccare su '🔮 CALCOLA PREDIZIONE' per generare il valore del Semaforo!")
-    else:
-        stringa_attivita_completa = ", ".join(attivita) if attivita else "Nessuna"
-        note_finali = f"[Attività svolte: {stringa_attivita_completa}] {note_input}".strip()
-        
-        payload = {
-            ENTRY_ID['data']: data_sel.strftime("%d/%m/%Y"),
-            ENTRY_ID['posizione']: posizione,
-            ENTRY_ID['temp']: str(int(temp)),
-            ENTRY_ID['sonno']: sonno,
-            ENTRY_ID['energia']: str(energia),
-            ENTRY_ID['passi']: passi,
-            ENTRY_ID['dolore']: str(dolore),
-            ENTRY_ID['semaforo']: str(int(round(st.session_state.valore_sem))),
-            ENTRY_ID['note']: note_finali
-        }
-        
-        if attivita:
-            payload[ENTRY_ID['attivita']] = attivita[0]
+    st.markdown("---")
+    
+    if st.button("🔮 CALCOLA PREDIZIONE 🔮", use_container_width=True):
+        somma_pesi_attivita = sum([PESI_ATTIVITA[a] for a in attivita])
+        score = 3.0 + (energia * 0.4) + PESI_SONNO[sonno] + PESI_PASSI[passi] + somma_pesi_attivita
+        st.session_state.valore_sem = round(max(1.0, min(10.0, score)), 1)
+
+    if st.session_state.valore_sem is not None:
+        if st.session_state.valore_sem <= 4.5:
+            pallino = "🔴"
+            testo_bollino = "BOLLINO ROSSO"
+        elif st.session_state.valore_sem <= 7.0:
+            pallino = "🟡"
+            testo_bollino = "BOLLINO GIALLO"
+        else:
+            pallino = "🟢"
+            testo_bollino = "BOLLINO VERDE"
             
-        try:
-            r = requests.post(URL_MODULO, data=payload)
-            if r.status_code == 200:
-                st.success("✅ Giornata registrata con successo nel modulo Google!")
-                st.session_state.valore_sem = None
+        st.markdown(f"<p style='text-align: center; font-weight: bold;'>{pallino} {st.session_state.valore_sem} - {testo_bollino} {pallino}</p>", unsafe_allow_html=True)
+        st.info("💡 Ora puoi passare alla scheda della **Sera** quando vuoi per aggiungere le note e registrare la giornata!")
+
+
+# --- TAB 2: SERA ---
+with tab_sera:
+    st.markdown("#### *Buonasera! Com'è andata davvero oggi?* 🌙")
+    st.markdown("Raccogliamo un ultimo feedback e salviamo i dati della giornata nel tuo diario.")
+    st.markdown("---")
+    
+    col_sera1, col_sera2 = st.columns(2)
+    with col_sera1:
+        dolore = st.slider("Che livello di dolore o fastidio hai avvertito in generale? (1-10):", 1, 10, 1)
+        
+    with col_sera2:
+        # Nuova tendina inserita come segnaposto
+        valutazione = st.selectbox(
+            "Riscontro rispetto alla predizione del mattino:",
+            ["Seleziona un'opzione...", "Match", "Overestimated", "Underestimated"]
+        )
+    
+    st.markdown("##")
+    st.markdown("<h3 style='text-align: center;'>💡 Note 💡</h3>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center;'><code>#sintomi</code> &nbsp; <code>#clima</code> &nbsp; <code>#attivita_extra</code> &nbsp; <code>#umore</code></p>", unsafe_allow_html=True)
+
+    note_input = st.text_area("Note aggiuntive:", label_visibility="collapsed", placeholder="Aggiungi qui qualsiasi annotazione libera o sintomo particolare della giornata...")
+
+    st.markdown("---")
+
+    if st.button("💾 REGISTRA GIORNATA", use_container_width=True):
+        if st.session_state.valore_sem is None:
+            st.error("⚠️ Attenzione: Devi prima calcolare il valore del Semaforo nella scheda '🌅 Mattina' prima di poter registrare!")
+        else:
+            stringa_attivita_completa = ", ".join(attivita) if attivita else "Nessuna"
+            note_finali = f"[Attività svolte: {stringa_attivita_completa}] {note_input}".strip()
+            
+            payload = {
+                ENTRY_ID['data']: data_sel.strftime("%d/%m/%Y"),
+                ENTRY_ID['posizione']: posizione,
+                ENTRY_ID['temp']: str(int(temp)),
+                ENTRY_ID['sonno']: sonno,
+                ENTRY_ID['energia']: str(energia),
+                ENTRY_ID['passi']: passi,
+                ENTRY_ID['dolore']: str(dolore),
+                ENTRY_ID['semaforo']: str(int(round(st.session_state.valore_sem))),
+                ENTRY_ID['note']: note_finali
+            }
+            
+            # Invia il valore della tendina solo se è stato selezionato qualcosa di diverso dal default
+            if valutazione != "Seleziona un'opzione...":
+                payload[ENTRY_ID['valutazione_predizione']] = valutazione
             else:
-                st.error(f"❌ Errore HTTP {r.status_code}. Il server ha rifiutato la richiesta.")
-        except Exception as e:
-            st.error(f"⚠️ Errore di connessione: {e}")
+                payload[ENTRY_ID['valutazione_predizione']] = ""
+            
+            if attivita:
+                payload[ENTRY_ID['attivita']] = attivita[0]
+                
+            try:
+                r = requests.post(URL_MODULO, data=payload)
+                if r.status_code == 200:
+                    st.success("✅ Splendido! La tua giornata è stata registrata con successo.")
+                    st.session_state.valore_sem = None
+                else:
+                    st.error(f"❌ Errore HTTP {r.status_code}. Il server ha rifiutato la richiesta.")
+            except Exception as e:
+                st.error(f"⚠️ Errore di connessione: {e}")
