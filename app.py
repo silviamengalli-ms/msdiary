@@ -21,7 +21,7 @@ ENTRY_ID = {
     'valutazione_predizione': 'entry.375319797'
 }
 
-# --- PESI RICALIBRATI ---
+# --- PESI DEFINITIVI ---
 PESI_SONNO = {"discreta": 0.0, "soddisfacente": 1.0, "scarsa": -1.5}
 PESI_PASSI = {"fino a 1000": 0.5, "da 1001 a 3000": 0.0, "oltre i 3000": -0.3}
 PESI_ATTIVITA = {
@@ -64,15 +64,15 @@ with tab_mattina:
         
     attivita = st.multiselect("Attività in programma:", list(PESI_ATTIVITA.keys()))
 
-    # --- CALCOLO RICALIBRATO ---
+    # --- CALCOLO FINALE RICALIBRATO ---
     somma_pesi_attivita = sum([PESI_ATTIVITA[a] for a in attivita])
     
-    if temp <= 28.0:
+    # Penalità caldo (Sensibile dai 28°C in su)
+    if temp < 28.0:
         peso_temperatura = 0.0
-    elif 28.0 < temp <= 30.0:
-        peso_temperatura = -0.5
     else:
-        peso_temperatura = -1.0 - ((temp - 30.0) * 0.1)
+        gradi_sopra_28 = temp - 28.0
+        peso_temperatura = -0.5 - (gradi_sopra_28 * 0.3)
     
     # Formula: Base 5.0 + Energia (0.3) + Fattori
     score = 5.0 + (energia * 0.3) + PESI_SONNO[sonno] + PESI_PASSI[passi] + somma_pesi_attivita + peso_temperatura
