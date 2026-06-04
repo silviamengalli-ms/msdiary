@@ -1,6 +1,8 @@
 import streamlit as st
 import datetime
 import requests
+import time
+import random
 
 # --- CONFIGURAZIONE ---
 st.set_page_config(page_title="La Mia Carica - MS Diary", layout="centered", page_icon="🔋")
@@ -8,7 +10,7 @@ st.set_page_config(page_title="La Mia Carica - MS Diary", layout="centered", pag
 # URL DEFINITIVO (Punta al formResponse del modulo ufficiale)
 URL_MODULO = "https://docs.google.com/forms/d/e/1FAIpQLSfsNrtCcCMKrQ22pM-7NfrW7F9xWvtUSZPNBu83AgV9ZyWtDQ/formResponse"
 
-# MAPPATURA COMPLETA E CORRETTA AL 100% DEL TUO MODULO DEFINITIVO
+# MAPPATURA COMPLETA E CORRETTA DEL TUO MODULO
 ENTRY_ID = {
     'data': 'entry.2022449610',
     'posizione': 'entry.1412086707',
@@ -39,11 +41,29 @@ if 'mattina_salvata' not in st.session_state:
         'valore_sem': None
     })
 
-# --- FUNZIONE METEO IN MODALITÀ DIAGNOSTICA ---
-@st.cache_data(ttl=60) # Cache ridotta a 1 minuto per aiutarti a fare i test in tempo reale
+# --- FUNZIONE AUSILIARIA PER GESTIRE IL TRAFFICO (RETRY LOGIC) ---
+def invia_richiesta_con_riconnessione(url, parametri):
+    """Invia una richiesta e se trova 'troppo traffico (429)' riprova dopo una breve pausa"""
+    for tentativo in range(3): # Ci prova fino a 3 volte
+        try:
+            risposta = requests.get(url, params=parametri, timeout=5)
+            if risposta.status_code == 200:
+                return risposta # Successo!
+            elif risposta.status_code == 429:
+                # Se il server è congestionato, aspetta un tempo casuale tra 0.5 e 2 secondi e riprova
+                time.sleep(random.uniform(0.5, 2.0))
+                continue
+            else:
+                return risposta
+        except requests.exceptions.RequestException:
+            time.sleep(random.uniform(0.5, 2.0))
+    return None
+
+# --- FUNZIONE METEO CON OPEN-METEO POTENZIATA ---
+@st.cache_data(ttl=60)
 def recupera_meteo(data, nome_citta):
     try:
-        # 1. TEST GEOLOCALIZZAZIONE
+        # 1. GEOLOCALIZZAZIONE (Trova le coordinate della città)
         url_geo = "https://geocoding-api.open-meteo.com/v1/search"
         params_geo = {
             "name": nome_citta.strip(),
@@ -51,21 +71,23 @@ def recupera_meteo(data, nome_citta):
             "language": "it",
             "format": "json"
         }
-        res_geo = requests.get(url_geo, params=params_geo, timeout=5)
         
-        if res_geo.status_code != 200:
-            return 20.0, 50, f"Errore Geocoding (HTTP {res_geo.status_code}): {res_geo.text}"
+        risposta_geo = invia_richiesta_con_riconnessione(url_geo, params_geo)
+        
+        if not risposta_geo or risposta_geo.status_code != 200:
+            errore = risposta_geo.text if risposta_geo else "Timeout di rete"
+            return 20.0, 50, f"Geocoding non riuscito (Server occupato): {errore}"
             
-        data_geo = res_geo.json()
+        data_geo = risposta_geo.json()
         
-        lat, lon = 45.43, 10.99 # Default Verona
+        lat, lon = 45.43, 10.99 # Default Verona se non trova nulla
         if "results" in data_geo and len(data_geo["results"]) > 0:
             lat = data_geo["results"][0]["latitude"]
             lon = data_geo["results"][0]["longitude"]
         else:
-            return 20.0, 50, f"La città '{nome_citta}' non è stata trovata sulle mappe di Open-Meteo. Verifica il nome."
+            return 20.0, 50, f"Città '{nome_citta}' non trovata. Controlla come è scritta."
             
-        # 2. TEST RICHIESTA METEO
+        # 2. RICHIESTA DATI METEO REALI
         d_str = data.strftime("%Y-%m-%d")
         url_meteo = "https://api.open-meteo.com/v1/forecast"
         
@@ -79,32 +101,29 @@ def recupera_meteo(data, nome_citta):
             "timezone": "Europe/Rome"
         }
         
-        risposta_meteo = requests.get(url_meteo, params=params_meteo, timeout=5)
+        risposta_meteo = invia_richiesta_con_riconnessione(url_meteo, params_meteo)
         
-        if risposta_meteo.status_code != 200:
-            return 20.0, 50, f"Errore Server Meteo (HTTP {risposta_meteo.status_code}): {risposta_meteo.text}"
+        if not risposta_meteo or risposta_meteo.status_code != 200:
+            errore = risposta_meteo.text if risposta_meteo else "Timeout di rete"
+            return 20.0, 50, f"Meteo non disponibile (Server occupato dopo 3 tentativi): {errore}"
             
         resp = risposta_meteo.json()
         
-        if 'daily' not in resp or 'hourly' not in resp:
-            return 20.0, 50, f"Il server ha risposto ma i dati sono incompleti: {resp}"
-            
+        # Estrazione e calcolo della media umidità
         val_temp = float(resp['daily']['temperature_2m_max'][0])
         umidita_orarie = resp['hourly']['relative_humidity_2m']
         val_umidita = int(sum(umidita_orarie) / len(umidita_orarie))
         
-        return val_temp, val_umidita, None # Nessun errore!
+        return val_temp, val_umidita, None # Tutto funzionante!
         
     except Exception as e: 
-        # Cattura l'errore sistemico esatto (es. assenza di internet, timeout)
-        return 20.0, 50, f"Eccezione di rete o di sistema: {str(e)}"
+        return 20.0, 50, f"Errore imprevisto nel sistema: {str(e)}"
 
 # --- INTERFACCIA UTENTE ---
 st.title("🔋 La Mia Carica")
 st.markdown("---")
 st.markdown("Buongiorno! Prepariamoci per affrontare la giornata 😊")
 
-# Generazione dei Tab
 tab_mattina, tab_sera = st.tabs(["🌅 Pianifica la Mattina", "🌌 Feedback Serale"])
 
 # ==========================================
@@ -117,17 +136,17 @@ with tab_mattina:
         data_sel = st.date_input("🗓️ Data:", value=datetime.date.today())
         posizione_input = st.text_input("📍 Posizione:", value=st.session_state.posizione)
     
-    # Chiamata alla funzione meteo con tracciamento dell'errore
+    # Esecuzione del motore Open-Meteo intelligente
     temp_api, umidita_api, errore_rilevato = recupera_meteo(data_sel, posizione_input)
     
     with col2:
         temp = st.number_input("🌡️ Temperatura prevista (°C):", value=temp_api)
         umidita = st.number_input("💧 Umidità media prevista (%):", value=int(umidita_api))
     
-    # SE C'È UN ERRORE, ORA L'APP LO MOSTRA CHIARAMENTE A SCHERMO
+    # Se il server fallisce tutti e 3 i tentativi, mostra un avviso ma ti fa andare avanti
     if errore_rilevato:
-        st.error(f"⚠️ DATI METEO NON DISPONIBILI\nDettaglio tecnico: {errore_rilevato}")
-        st.caption("ℹ️ Sono stati caricati i valori standard temporanei (20° e 50%). Puoi comunque modificarli a mano e procedere!")
+        st.warning("⚠️ Centralina meteo momentaneamente sovraccarica. Aggiorna la pagina o modifica i dati a mano per salvare!")
+        st.caption(f"Dettaglio tecnico per controllo: {errore_rilevato}")
     
     st.markdown("---") 
     
@@ -195,7 +214,6 @@ with tab_sera:
         note = st.text_area("Note o riflessioni serali:", placeholder="Scrivi qui le tue annotazioni... (#sintomi, #clima, #umore)")
         
         if st.button("💾 REGISTRA IL MIO DIARIO", use_container_width=True):
-            
             stringa_attivita_completa = ", ".join(st.session_state.attivita) if st.session_state.attivita else "Nessuna"
             note_finali = f"[Attività svolte: {stringa_attivita_completa}] {note}".strip()
             
