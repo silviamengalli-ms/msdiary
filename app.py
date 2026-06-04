@@ -140,7 +140,7 @@ with tab_mattina:
     temp_api, umidita_api, errore_rilevato = recupera_meteo(data_sel, posizione_input)
     
     with col2:
-        temp = st.number_input("🌡️ Temperatura prevista (°C):", value=temp_api)
+        temp = st.number_input("🌡️ Temperatura massima prevista per oggi (°C):", value=temp_api)
         umidita = st.number_input("💧 Umidità media prevista (%):", value=int(umidita_api))
     
     # Se il server fallisce tutti e 3 i tentativi, mostra un avviso ma ti fa andare avanti
