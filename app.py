@@ -140,34 +140,42 @@ with tab_sera:
         
         if st.button("💾 REGISTRA IL MIO DIARIO", use_container_width=True):
             
-            # Stringa pulita per le attività multiple
-            stringa_attivita = ", ".join(st.session_state.attivita) if st.session_state.attivita else "Nessuna"
+            # Ripristiniamo il tuo trucco originale: salviamo la lista completa nelle note per non mandare in blocco Google
+            stringa_attivita_completa = ", ".join(st.session_state.attivita) if st.session_state.attivita else "Nessuna"
+            note_finali = f"[Attività svolte: {stringa_attivita_completa}] {note}".strip()
             
-            # Costruzione finale del Payload
+            # Costruzione del Payload con conversioni sicure (tutti numeri interi in formato stringa)
             payload = {
                 ENTRY_ID['data']: st.session_state.mattina_data.strftime("%d/%m/%Y"),
                 ENTRY_ID['posizione']: st.session_state.posizione,
-                ENTRY_ID['temp']: str(int(st.session_state.temp)),
-                ENTRY_ID['umidita']: str(st.session_state.umidita),
+                ENTRY_ID['temp']: str(int(round(st.session_state.temp))),
+                ENTRY_ID['umidita']: str(int(st.session_state.umidita)),
                 ENTRY_ID['sonno']: st.session_state.sonno,
-                ENTRY_ID['energia']: str(st.session_state.energia),
-                ENTRY_ID['attivita']: stringa_attivita,
+                ENTRY_ID['energia']: str(int(st.session_state.energia)),
                 ENTRY_ID['passi']: st.session_state.passi,
-                ENTRY_ID['semaforo']: str(st.session_state.valore_sem),
-                ENTRY_ID['valutazione']: valutazione, # Ora passa correttamente il valore al nuovo ID!
-                ENTRY_ID['dolore']: str(dolore),
-                ENTRY_ID['note']: note
+                # CORREZIONE 1: Trasformiamo il semaforo in intero (es. da 4.5 a 5) così la scala lineare di Google non si arrabbia
+                ENTRY_ID['semaforo']: str(int(round(st.session_state.valore_sem))),
+                ENTRY_ID['valutazione']: valutazione,
+                ENTRY_ID['dolore']: str(int(dolore)),
+                ENTRY_ID['note']: note_finali
             }
+            
+            # CORREZIONE 2: Nel menu a tendina di Google passiamo solo la prima attività selezionata.
+            # Se l'elenco è vuoto, passiamo "riposo totale" (che è un'opzione valida del tuo modulo) per evitare campi obbligatori vuoti.
+            if st.session_state.attivita:
+                payload[ENTRY_ID['attivita']] = st.session_state.attivita[0]
+            else:
+                payload[ENTRY_ID['attivita']] = "riposo totale"
             
             try:
                 r = requests.post(URL_MODULO, data=payload)
                 if r.status_code == 200:
-                    st.balloons() # Animazione celebrativa!
+                    st.balloons() # Animazione!
                     st.success("✅ Dati registrati con successo nel tuo diario definitivo! Buona serata e riposati. 🌟")
                     
-                    # Riapriamo la possibilità di compilare un nuovo giorno al prossimo avvio
+                    # Sblocca la sessione per il giorno successivo
                     st.session_state.mattina_salvata = False 
                 else:
-                    st.error(f"❌ Errore di salvataggio (Codice HTTP {r.status_code}). Verifica la connessione.")
+                    st.error(f"❌ Errore di salvataggio (Codice HTTP {r.status_code}). Verifica la configurazione dei campi.")
             except Exception as e:
                 st.error(f"⚠️ Impossibile raggiungere Google Moduli: {e}")
