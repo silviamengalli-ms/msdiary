@@ -39,31 +39,65 @@ if 'mattina_salvata' not in st.session_state:
         'valore_sem': None
     })
 
-# --- FUNZIONE METEO CON WEATHERAPI (STABILE E VELOCE) ---
+# --- FUNZIONE METEO CON OPEN-METEO (OTTIMIZZATA E SICURA) ---
 @st.cache_data(ttl=3600)
 def recupera_meteo(data, nome_citta):
-    API_KEY = "067645ccb00b41bfb90135805232110"
     try:
-        d_str = data.strftime("%Y-%m-%d")
-        url = f"http://api.weatherapi.com/v1/forecast.json?key={API_KEY}&q={nome_citta}&days=1&dt={d_str}&lang=it"
-        risposta = requests.get(url, timeout=5)
+        # 1. GEOLOCALIZZAZIONE SICURA: Gestisce correttamente gli spazi nei nomi delle città
+        url_geo = "https://geocoding-api.open-meteo.com/v1/search"
+        params_geo = {
+            "name": nome_citta.strip(),
+            "count": 1,
+            "language": "it",
+            "format": "json"
+        }
+        risposta_geo = requests.get(url_geo, params=params_geo, timeout=5).json()
         
-        if risposta.status_code != 200:
-            return 20.0, 50, True
+        # Coordinate di default (Verona) se la ricerca della città fallisce
+        lat, lon = 45.43, 10.99 
+        if "results" in risposta_geo and len(risposta_geo["results"]) > 0:
+            lat = risposta_geo["results"][0]["latitude"]
+            lon = risposta_geo["results"][0]["longitude"]
             
-        data_json = risposta.json()
-        val_temp = float(data_json['forecast']['forecastday'][0]['day']['maxtemp_c'])
-        val_umidita = int(data_json['forecast']['forecastday'][0]['day']['avghumidity'])
+        # 2. GESTIONE DATA: Se la data è nel passato, cambiamo endpoint usando l'archivio storico
+        d_str = data.strftime("%Y-%m-%d")
+        oggi = datetime.date.today()
+        
+        if data < oggi:
+            url_meteo = "https://archive-api.open-meteo.com/v1/archive"
+        else:
+            url_meteo = "https://api.open-meteo.com/v1/forecast"
+            
+        params_meteo = {
+            "latitude": lat,
+            "longitude": lon,
+            "start_date": d_str,
+            "end_date": d_str,
+            "daily": "temperature_2m_max,relative_humidity_2m_mean",
+            "timezone": "Europe/Rome"
+        }
+        
+        # 3. RICHIESTA IN HTTPS
+        risposta_meteo = requests.get(url_meteo, params=params_meteo, timeout=5)
+        
+        if risposta_meteo.status_code != 200:
+            return 20.0, 50, True # Paracadute in caso di errore del server (es. 502)
+            
+        resp = risposta_meteo.json()
+        val_temp = float(resp['daily']['temperature_2m_max'][0])
+        val_umidita = int(resp['daily']['relative_humidity_2m_mean'][0])
+        
         return val_temp, val_umidita, False
-    except:
+    except: 
+        # Paracadute estremo in caso di totale assenza di rete
         return 20.0, 50, True
 
-# --- INTERFACCIA ACCOGLIENTE ---
+# --- INTERFACCIA UTENTE ---
 st.title("🔋 La Mia Carica")
 st.markdown("---")
 st.markdown("Buongiorno! Prepariamoci per affrontare la giornata 😊")
 
-# CREAZIONE DEI TAB (Questa riga fondamentale risolve il NameError)
+# Creazione delle schede (Tab)
 tab_mattina, tab_sera = st.tabs(["🌅 Pianifica la Mattina", "🌌 Feedback Serale"])
 
 # ==========================================
@@ -76,12 +110,14 @@ with tab_mattina:
         data_sel = st.date_input("🗓️ Data:", value=datetime.date.today())
         posizione_input = st.text_input("📍 Posizione:", value=st.session_state.posizione)
     
+    # Esecuzione del motore Open-Meteo ottimizzato
     temp_api, umidita_api, usa_standard = recupera_meteo(data_sel, posizione_input)
     
     with col2:
         temp = st.number_input("🌡️ Temperatura prevista (°C):", value=temp_api)
         umidita = st.number_input("💧 Umidità media prevista (%):", value=int(umidita_api))
     
+    # Se il sistema è costretto a usare i dati standard, mostra l'avviso arancione
     if usa_standard:
         st.caption("⚠️ Dati meteo in tempo reale non disponibili. Usati valori standard (modificabili a mano).")
     
@@ -106,81 +142,4 @@ with tab_mattina:
             
         p_temp = 0.0 if temp < 28.0 else -0.5 - ((temp - 28.0) * 0.3)
         
-        peso_sonno = {"discreta": 0.0, "soddisfacente": 1.0, "scarsa": -1.5}[sonno]
-        peso_passi = {"fino a 1000": 0.5, "da 1001 a 3000": 0.0, "oltre i 3000": -0.3}[passi]
-        
-        score = 5.0 + (energia * 0.3) + peso_sonno + peso_passi + somma_att + p_temp
-        valore_calcolato = round(max(1.0, min(10.0, score)), 1)
-        
-        st.session_state.update({
-            'mattina_salvata': True,
-            'mattina_data': data_sel, 
-            'posizione': posizione_input,
-            'temp': temp, 
-            'umidita': umidita, 
-            'sonno': sonno, 
-            'passi': passi, 
-            'energia': energia, 
-            'attivita': attivita, 
-            'valore_sem': valore_calcolato
-        })
-        
-        st.markdown("---") 
-        
-        if valore_calcolato <= 4.5:
-            st.error(f"🔴 BOLLINO ROSSO: {valore_calcolato} La tua energia stimata è bassa oggi. Cerca di dare priorità al riposo e non sovraccaricarti 🐢")
-        elif valore_calcolato <= 7.0:
-            st.warning(f"🟡 BOLLINO GIALLO: {valore_calcolato} Giornata regolare. Procedi con calma e occhio a non esagerare 🐘")
-        else:
-            st.success(f"🟢 BOLLINO VERDE: {valore_calcolato} Ottimo! Hai una buona carica per affrontare la giornata con serenità 🦋")
-
-        st.write("✅ Dati della mattina salvati in memoria! Ti aspetto stasera per registrare il feedback")
-
-# ==========================================
-# TAB SERA (Consuntivo e Invio)
-# ==========================================
-with tab_sera:
-    if not st.session_state.mattina_salvata:
-        st.warning("⚠️ Compila e salva prima i dati del mattino nella scheda precedente!")
-    else:
-        st.subheader("Com'è andata la giornata?")
-        st.markdown(f"Stamattina il sistema aveva previsto un semaforo di: **{st.session_state.valore_sem}**")
-        
-        valutazione = st.selectbox("Il punteggio del mattino era corretto? (Riscontro):", ["Match", "Overestimated", "Underestimated"])
-        dolore = st.slider("Livello dolore avvertito (1-10):", 1, 10, 1)
-        note = st.text_area("Note o riflessioni serali:", placeholder="Scrivi qui le tue annotazioni... (#sintomi, #clima, #umore)")
-        
-        if st.button("💾 REGISTRA IL MIO DIARIO", use_container_width=True):
-            
-            stringa_attivita_completa = ", ".join(st.session_state.attivita) if st.session_state.attivita else "Nessuna"
-            note_finali = f"[Attività svolte: {stringa_attivita_completa}] {note}".strip()
-            
-            payload = {
-                ENTRY_ID['data']: st.session_state.mattina_data.strftime("%d/%m/%Y"),
-                ENTRY_ID['posizione']: st.session_state.posizione,
-                ENTRY_ID['temp']: str(int(round(st.session_state.temp))),
-                ENTRY_ID['umidita']: str(int(st.session_state.umidita)),
-                ENTRY_ID['sonno']: st.session_state.sonno,
-                ENTRY_ID['energia']: str(int(st.session_state.energia)),
-                ENTRY_ID['passi']: st.session_state.passi,
-                ENTRY_ID['semaforo']: str(int(round(st.session_state.valore_sem))),
-                ENTRY_ID['valutazione']: valutazione,
-                ENTRY_ID['dolore']: str(int(dolore)),
-                ENTRY_ID['note']: note_finali
-            }
-            
-            if st.session_state.attivita:
-                payload[ENTRY_ID['attivita']] = st.session_state.attivita[0]
-            else:
-                payload[ENTRY_ID['attivita']] = "riposo totale"
-            
-            try:
-                r = requests.post(URL_MODULO, data=payload)
-                if r.status_code == 200:
-                    st.balloons()
-                    st.write("✅ Dati registrati con successo nel tuo diario! Buona notte e sogni d'oro! 🌟")
-                    st.session_state.mattina_salvata = False 
-                else:
-                    st.error(f"❌ Errore di salvataggio (Codice HTTP {r.status_code}). Verifica la configurazione dei campi.")
-            except Exception as e:
-                st.error(f"⚠️ Impossibile raggiungere Google Moduli: {e}")
+        peso_sonno = {"discreta": 0.0,
