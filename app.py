@@ -20,7 +20,7 @@ ENTRY_ID = {
     'passi': 'entry.28384771',
     'semaforo': 'entry.625659299',
     'dolore': 'entry.672372933',
-    'valutazione': 'entry.2023032977', # Il tuo nuovo campo aggiunto con successo!
+    'valutazione': 'entry.2023032977',
     'note': 'entry.158362423'
 }
 
@@ -39,15 +39,28 @@ if 'mattina_salvata' not in st.session_state:
         'valore_sem': None
     })
 
-# --- FUNZIONI METEO ---
+# --- FUNZIONI METEO CON GEOLOCALIZZAZIONE DINAMICA ---
 @st.cache_data(ttl=3600)
-def recupera_meteo(data):
+def recupera_meteo(data, nome_citta):
     try:
+        # 1. GEOCALIZZAZIONE: Cerchiamo le coordinate del nome inserito dall'utente
+        url_geo = f"https://geocoding-api.open-meteo.com/v1/search?name={nome_citta}&count=1&language=it&format=json"
+        risposta_geo = requests.get(url_geo).json()
+        
+        # Coordinate di default (Verona) nel caso in cui la ricerca fallisca
+        lat, lon = 45.43, 10.99 
+        
+        if "results" in risposta_geo and len(risposta_geo["results"]) > 0:
+            lat = risposta_geo["results"][0]["latitude"]
+            lon = risposta_geo["results"][0]["longitude"]
+            
+        # 2. METEO: Scarichiamo i dati meteo usando le coordinate trovate
         d = data.strftime("%Y-%m-%d")
-        url = f"https://api.open-meteo.com/v1/forecast?latitude=45.43&longitude=10.99&start_date={d}&end_date={d}&daily=temperature_2m_max,relative_humidity_2m_mean&timezone=Europe/Rome"
-        resp = requests.get(url).json()
+        url_meteo = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&start_date={d}&end_date={d}&daily=temperature_2m_max,relative_humidity_2m_mean&timezone=Europe/Rome"
+        resp = requests.get(url_meteo).json()
         return float(resp['daily']['temperature_2m_max'][0]), int(resp['daily']['relative_humidity_2m_mean'][0])
     except: 
+        # Fallback sicuro in caso di totale assenza di connessione o errore API
         return 20.0, 50
 
 # --- INTERFACCIA ACCOGLIENTE ---
@@ -63,7 +76,9 @@ tab_mattina, tab_sera = st.tabs(["🌅 Pianifica la Mattina", "🌌 Feedback Ser
 with tab_mattina:
     data_sel = st.date_input("🗓️ Data:", value=datetime.date.today())
     posizione_input = st.text_input("📍 Posizione:", value=st.session_state.posizione)
-    temp_api, umidita_api = recupera_meteo(data_sel)
+    
+    # AGGIORNAMENTO: Passiamo il testo della posizione alla funzione meteo
+    temp_api, umidita_api = recupera_meteo(data_sel, posizione_input)
     
     col1, col2 = st.columns(2)
     with col1:
@@ -100,7 +115,7 @@ with tab_mattina:
         st.session_state.update({
             'mattina_salvata': True,
             'mattina_data': data_sel, 
-            'posizione': posizione_input,
+            'posizione': posizione_input, # Salva la città corretta inserita
             'temp': temp, 
             'umidita': umidita_api, 
             'sonno': sonno, 
@@ -110,7 +125,7 @@ with tab_mattina:
             'valore_sem': valore_calcolato
         })
         
-        st.success("✅ Dati della mattina salvati in memoria! Ci vediamo stasera per vedere com'è andata! Buona giornata")
+        st.success("✅ Dati della mattina salvati in memoria! Ci vedere stasera per vedere com'è andata! Buona giornata")
         
         # Visualizzazione Grafica Semaforo
         if valore_calcolato <= 4.5:
@@ -140,11 +155,9 @@ with tab_sera:
         
         if st.button("💾 REGISTRA IL MIO DIARIO", use_container_width=True):
             
-            # Ripristiniamo il tuo trucco originale: salviamo la lista completa nelle note per non mandare in blocco Google
             stringa_attivita_completa = ", ".join(st.session_state.attivita) if st.session_state.attivita else "Nessuna"
             note_finali = f"[Attività svolte: {stringa_attivita_completa}] {note}".strip()
             
-            # Costruzione del Payload con conversioni sicure (tutti numeri interi in formato stringa)
             payload = {
                 ENTRY_ID['data']: st.session_state.mattina_data.strftime("%d/%m/%Y"),
                 ENTRY_ID['posizione']: st.session_state.posizione,
@@ -153,15 +166,12 @@ with tab_sera:
                 ENTRY_ID['sonno']: st.session_state.sonno,
                 ENTRY_ID['energia']: str(int(st.session_state.energia)),
                 ENTRY_ID['passi']: st.session_state.passi,
-                # CORREZIONE 1: Trasformiamo il semaforo in intero (es. da 4.5 a 5) così la scala lineare di Google non si arrabbia
                 ENTRY_ID['semaforo']: str(int(round(st.session_state.valore_sem))),
                 ENTRY_ID['valutazione']: valutazione,
                 ENTRY_ID['dolore']: str(int(dolore)),
                 ENTRY_ID['note']: note_finali
             }
             
-            # CORREZIONE 2: Nel menu a tendina di Google passiamo solo la prima attività selezionata.
-            # Se l'elenco è vuoto, passiamo "riposo totale" (che è un'opzione valida del tuo modulo) per evitare campi obbligatori vuoti.
             if st.session_state.attivita:
                 payload[ENTRY_ID['attivita']] = st.session_state.attivita[0]
             else:
@@ -170,10 +180,8 @@ with tab_sera:
             try:
                 r = requests.post(URL_MODULO, data=payload)
                 if r.status_code == 200:
-                    st.balloons() # Animazione!
+                    st.balloons()
                     st.success("✅ Dati registrati con successo nel tuo diario! Buona notte e sogni d'oro! 🌟")
-                    
-                    # Sblocca la sessione per il giorno successivo
                     st.session_state.mattina_salvata = False 
                 else:
                     st.error(f"❌ Errore di salvataggio (Codice HTTP {r.status_code}). Verifica la configurazione dei campi.")
