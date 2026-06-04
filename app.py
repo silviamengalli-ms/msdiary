@@ -39,59 +39,24 @@ if 'mattina_salvata' not in st.session_state:
         'valore_sem': None
     })
 
-# --- FUNZIONE METEO DOPPIA (CON FALLBACK AUTOMATICO IN CASO DI ERRORE 502) ---
+# --- FUNZIONI METEO CON GEOLOCALIZZAZIONE DINAMICA ---
 @st.cache_data(ttl=3600)
 def recupera_meteo(data, nome_citta):
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    }
-    
-    # --- TENTATIVO 1: OPEN-METEO ---
     try:
         url_geo = f"https://geocoding-api.open-meteo.com/v1/search?name={nome_citta}&count=1&language=it&format=json"
-        resp_geo = requests.get(url_geo, headers=headers, timeout=5)
+        risposta_geo = requests.get(url_geo).json()
         
-        if resp_geo.status_code == 200:
-            risposta_geo = resp_geo.json()
-            lat, lon = 45.43, 10.99 
-            if "results" in risposta_geo and len(risposta_geo["results"]) > 0:
-                lat = risposta_geo["results"][0]["latitude"]
-                lon = risposta_geo["results"][0]["longitude"]
-                
-            d = data.strftime("%d-%m-%Y")
-            url_meteo = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&start_date={d}&end_date={d}&daily=temperature_2m_max,temperature_2m_min&hourly=relative_humidity_2m&timezone=Europe/Rome"
-            resp_meteo = requests.get(url_meteo, headers=headers, timeout=5)
+        lat, lon = 45.43, 10.99 
+        if "results" in risposta_geo and len(risposta_geo["results"]) > 0:
+            lat = risposta_geo["results"][0]["latitude"]
+            lon = risposta_geo["results"][0]["longitude"]
             
-            if resp_meteo.status_code == 200:
-                resp = resp_meteo.json()
-                temp_max = float(resp['daily']['temperature_2m_max'][0])
-                temp_min = float(resp['daily']['temperature_2m_min'][0])
-                lista_umidita = [x for x in resp['hourly']['relative_humidity_2m'] if x is not None]
-                umidita_media = int(sum(lista_umidita) / len(lista_umidita)) if lista_umidita else 50
-                
-                return temp_max, umidita_media, f"ℹ️ [Open-Meteo] Oggi escursione termica da {temp_min}°C a {temp_max}°C."
-    except:
-        pass  # Se fallisce Open-Meteo, passa oltre senza rompersi
-
-    # --- TENTATIVO 2 (FALLBACK): WTTR.IN (Se Open-Meteo è in errore 502) ---
-    try:
-        # Interroghiamo wttr.in richiedendo l'output in formato JSON pulito
-        url_fallback = f"https://wttr.in/{nome_citta}?format=j1"
-        resp_fb = requests.get(url_fallback, headers=headers, timeout=5)
-        
-        if resp_fb.status_code == 200:
-            data_fb = resp_fb.json()
-            # Estraiamo la temperatura massima e l'umidità media del giorno corrente
-            temp_max = float(data_fb['weather'][0]['maxtempC'])
-            temp_min = float(data_fb['weather'][0]['mintempC'])
-            umidita_media = int(data_fb['weather'][0]['hourly'][4]['humidity']) # Prende un valore medio di metà giornata
-            
-            return temp_max, umidita_media, f"ℹ️ [Servizio Riserva] Oggi escursione termica da {temp_min}°C a {temp_max}°C."
-    except:
-        pass
-
-    # --- TENTATIVO 3: VALORI STANDARD DI EMERGENZA ---
-    return 20.0, 50, "ℹ️ Servizi meteo temporaneamente offline. Usati valori standard stabili (20°C, 50%)."
+        d = data.strftime("%Y-%m-%d")
+        url_meteo = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&start_date={d}&end_date={d}&daily=temperature_2m_max,relative_humidity_2m_mean&timezone=Europe/Rome"
+        resp = requests.get(url_meteo).json()
+        return float(resp['daily']['temperature_2m_max'][0]), int(resp['daily']['relative_humidity_2m_mean'][0])
+    except: 
+        return 20.0, 50
 
 # --- INTERFACCIA ACCOGLIENTE ---
 st.title("🔋 La Mia Carica")
@@ -104,23 +69,24 @@ tab_mattina, tab_sera = st.tabs(["🌅 Pianifica la Mattina", "🌌 Feedback Ser
 # TAB MATTINA (Pianificazione)
 # ==========================================
 with tab_mattina:
+    # 1. CREIAMO LE DUE COLONNE PER LA PRIMA RIGA (Data/Luogo vs Meteo)
     col1, col2 = st.columns(2)
     
     with col1:
         data_sel = st.date_input("🗓️ Data:", value=datetime.date.today())
         posizione_input = st.text_input("📍 Posizione:", value=st.session_state.posizione)
     
-    # Il sistema gestisce da solo l'errore 502 cercando l'alternativa
-    temp_api, umidita_api, nota_meteo = recupera_meteo(data_sel, posizione_input)
+    # TRUCCO DI COERENZA: Recuperiamo il meteo subito dopo gli input di col1, così col2 ha i dati pronti!
+    temp_api, umidita_api = recupera_meteo(data_sel, posizione_input)
     
     with col2:
         temp = st.number_input("🌡️ Temperatura prevista (°C):", value=temp_api)
+        # Sistemata la sintassi dell'input numerico dell'umidità
         umidita = st.number_input("💧 Umidità media prevista (%):", value=int(umidita_api))
     
-    st.caption(nota_meteo)
+    st.markdown("---") # Linea di separazione elegante
     
-    st.markdown("---") 
-    
+    # 2. DA QUI IN POI IL CODICE È FUORI DALLE COLONNE, QUINDI APPARIRÀ A COLONNA UNICA (TUTTA LARGHEZZA)
     sonno = st.selectbox("💤 Qualità del sonno:", ["discreta", "soddisfacente", "scarsa"])
     passi = st.selectbox("🚶 Passi previsti:", ["fino a 1000", "da 1001 a 3000", "oltre i 3000"])
     energia = st.slider("⚡ Energia al risveglio (1-10):", 1, 10, 5)
@@ -129,6 +95,7 @@ with tab_mattina:
                               ["ufficio", "lavoro da casa", "piccole commissioni", "visita", "fisioterapia", "riposo totale", "sociale"])
 
     if st.button("🚀 Calcola e Salva Mattina", use_container_width=True):
+        # Logica Pesi Definitiva
         pesi = {
             "ufficio": -0.5, "lavoro da casa": -0.2, "piccole commissioni": -0.4, 
             "visita": -0.5, "fisioterapia": -0.5, "riposo totale": 0.5, "sociale": -0.7
@@ -146,12 +113,13 @@ with tab_mattina:
         score = 5.0 + (energia * 0.3) + peso_sonno + peso_passi + somma_att + p_temp
         valore_calcolato = round(max(1.0, min(10.0, score)), 1)
         
+        # Congelamento dei dati mattutini nella sessione
         st.session_state.update({
             'mattina_salvata': True,
             'mattina_data': data_sel, 
             'posizione': posizione_input,
             'temp': temp, 
-            'umidita': umidita, 
+            'umidita': umidita, # Usiamo il valore modificabile inserito nel widget
             'sonno': sonno, 
             'passi': passi, 
             'energia': energia, 
@@ -159,6 +127,7 @@ with tab_mattina:
             'valore_sem': valore_calcolato
         })
         
+
         st.markdown("---") 
         
         if valore_calcolato <= 4.5:
@@ -168,8 +137,8 @@ with tab_mattina:
         else:
             st.success(f"🟢 BOLLINO VERDE: {valore_calcolato} Ottimo! Hai una buona carica per affrontare la giornata con serenità 🦋")
 
-        st.write("✅ Dati della mattina salvati in memoria! Ti aspetto stasera per registrare il feedback")
 
+        st.write("✅ Dati della mattina salvati in memoria! Ti aspetto stasera per registrare il feedback")
 # ==========================================
 # TAB SERA (Consuntivo e Invio)
 # ==========================================
