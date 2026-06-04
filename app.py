@@ -61,7 +61,7 @@ def recupera_meteo(data, nome_citta):
 # --- INTERFACCIA ACCOGLIENTE ---
 st.title("🔋 La Mia Carica")
 st.markdown("---")
-st.markdown("Ben svegliata! Prepariamoci per affrontare la giornata 😊")
+st.markdown("Buongiorno! Prepariamoci per affrontare la giornata 😊")
 
 tab_mattina, tab_sera = st.tabs(["🌅 Pianifica la Mattina", "🌌 Feedback Serale"])
 
@@ -127,20 +127,18 @@ with tab_mattina:
             'valore_sem': valore_calcolato
         })
         
-        st.write("✅ Dati della mattina salvati in memoria! Ci vediamo stasera per vedere com'è andata! Buona giornata")
+
         st.markdown("---") 
         
         if valore_calcolato <= 4.5:
-            st.error(f"🔴 BOLLINO ROSSO: {valore_calcolato}")
-            st.write("La tua energia stimata è bassa oggi. Cerca di dare priorità al riposo e non sovraccaricarti. 💪")
+            st.error(f"🔴 BOLLINO ROSSO: {valore_calcolato} La tua energia stimata è bassa oggi. Cerca di dare priorità al riposo e non sovraccaricarti 🐢")
         elif valore_calcolato <= 7.0:
-            st.warning(f"🟡 BOLLINO GIALLO: {valore_calcolato}")
-            st.write("Giornata regolare. Procedi con calma e ascolta il tuo corpo. 🌼")
+            st.warning(f"🟡 BOLLINO GIALLO: {valore_calcolato} Giornata regolare. Procedi con calma e occhio a non esagerare 🐘")
         else:
-            st.success(f"🟢 BOLLINO VERDE: {valore_calcolato}")
-            st.write("Ottimo! Hai una buona carica per affrontare la giornata con serenità. ✨")
+            st.success(f"🟢 BOLLINO VERDE: {valore_calcolato} Ottimo! Hai una buona carica per affrontare la giornata con serenità 🦋")
 
 
+        st.write("✅ Dati della mattina salvati in memoria! Vediamoci stasera per registrare il feedback")
 # ==========================================
 # TAB SERA (Consuntivo e Invio)
 # ==========================================
