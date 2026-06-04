@@ -83,7 +83,7 @@ with tab_mattina:
     col1, col2 = st.columns(2)
     with col1:
         temp = st.number_input("🌡️ Temperatura prevista (°C):", value=temp_api)
-        st.info(f"💧 Umidità media prevista: {umidita_api}%")
+        st.write(f"💧 Umidità media prevista: {umidita_api}%")
         sonno = st.selectbox("💤 Qualità del sonno:", ["discreta", "soddisfacente", "scarsa"])
     with col2:
         passi = st.selectbox("🚶 Passi previsti:", ["fino a 1000", "da 1001 a 3000", "oltre i 3000"])
