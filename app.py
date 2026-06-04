@@ -39,10 +39,11 @@ if 'mattina_salvata' not in st.session_state:
         'valore_sem': None
     })
 
-# --- FUNZIONI METEO CON GEOLOCALIZZAZIONE DINAMICA E FIX API ---
+# --- FUNZIONI METEO CON DIAGNOSTICA DEGLI ERRORI ---
 @st.cache_data(ttl=3600)
 def recupera_meteo(data, nome_citta):
     try:
+        # 1. Geolocalizzazione
         url_geo = f"https://geocoding-api.open-meteo.com/v1/search?name={nome_citta}&count=1&language=it&format=json"
         risposta_geo = requests.get(url_geo).json()
         
@@ -52,21 +53,27 @@ def recupera_meteo(data, nome_citta):
             lon = risposta_geo["results"][0]["longitude"]
             
         d = data.strftime("%Y-%m-%d")
-        # Chiediamo le temperature max/min del giorno e l'umidità oraria per calcolare la media reale
+        # Richiesta dati daily + hourly
         url_meteo = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&start_date={d}&end_date={d}&daily=temperature_2m_max,temperature_2m_min&hourly=relative_humidity_2m&timezone=Europe/Rome"
         resp = requests.get(url_meteo).json()
         
-        temp_max = float(resp['daily']['temperature_2m_max'][0])
-        temp_min = float(resp['daily']['temperature_2m_min'][0])
-        lista_umidita = resp['hourly']['relative_humidity_2m']
-        umidita_media = int(sum(lista_umidita) / len(lista_umidita))
-        
-        # Generiamo la riga di testo discreta
-        info_breve = f"ℹ️ Oggi escursione termica prevista da {temp_min}°C (minima) a {temp_max}°C (massima)."
-        
-        return temp_max, umidita_media, info_breve
-    except: 
-        return 20.0, 50, "ℹ️ Dati meteo in tempo reale non disponibili (usati valori standard)."
+        if 'daily' in resp and 'hourly' in resp:
+            temp_max = float(resp['daily']['temperature_2m_max'][0]) if resp['daily']['temperature_2m_max'][0] is not None else 20.0
+            temp_min = float(resp['daily']['temperature_2m_min'][0]) if resp['daily']['temperature_2m_min'][0] is not None else 15.0
+            
+            # Estrazione e pulizia umidità da potenziali valori nulli (None)
+            lista_umidita = [x for x in resp['hourly']['relative_humidity_2m'] if x is not None]
+            umidita_media = int(sum(lista_umidita) / len(lista_umidita)) if lista_umidita else 50
+            
+            info_breve = f"ℹ️ Oggi escursione termica prevista da {temp_min}°C (minima) a {temp_max}°C (massima)."
+            return temp_max, umidita_media, info_breve
+        else:
+            ragione = resp.get('reason', 'Risposta API incompleta')
+            return 20.0, 50, f"ℹ️ Servizio meteo non raggiungibile ({ragione}). Usati valori standard."
+            
+    except Exception as e: 
+        # Mostra l'errore reale direttamente nella didascalia dell'app per fare debug
+        return 20.0, 50, f"ℹ️ Connessione meteo fallita (Errore: {str(e)}). Usati valori standard."
 
 # --- INTERFACCIA ACCOGLIENTE ---
 st.title("🔋 La Mia Carica")
@@ -79,26 +86,24 @@ tab_mattina, tab_sera = st.tabs(["🌅 Pianifica la Mattina", "🌌 Feedback Ser
 # TAB MATTINA (Pianificazione)
 # ==========================================
 with tab_mattina:
-    # 1. CREIAMO LE DUE COLONNE PER LA PRIMA RIGA (Data/Luogo vs Meteo)
     col1, col2 = st.columns(2)
     
     with col1:
         data_sel = st.date_input("🗓️ Data:", value=datetime.date.today())
         posizione_input = st.text_input("📍 Posizione:", value=st.session_state.posizione)
     
-    # Recuperiamo i dati reali e la nota di testo breve
+    # Recupero dei dati meteo ed eventuale testo di errore diagnostico
     temp_api, umidita_api, nota_meteo = recupera_meteo(data_sel, posizione_input)
     
     with col2:
         temp = st.number_input("🌡️ Temperatura prevista (°C):", value=temp_api)
         umidita = st.number_input("💧 Umidità media prevista (%):", value=int(umidita_api))
     
-    # Riga di testo piccolissima e grigia inserita in modo non invasivo sotto i campi meteo
+    # Questo testo ora ti dirà la minima/massima OPPURE il motivo esatto del blocco
     st.caption(nota_meteo)
     
-    st.markdown("---") # Linea di separazione elegante
+    st.markdown("---") 
     
-    # 2. DA QUI IN POI IL CODICE È FUORI DALLE COLONNE, QUINDI APPARIRÀ A COLONNA UNICA (TUTTA LARGHEZZA)
     sonno = st.selectbox("💤 Qualità del sonno:", ["discreta", "soddisfacente", "scarsa"])
     passi = st.selectbox("🚶 Passi previsti:", ["fino a 1000", "da 1001 a 3000", "oltre i 3000"])
     energia = st.slider("⚡ Energia al risveglio (1-10):", 1, 10, 5)
@@ -107,7 +112,6 @@ with tab_mattina:
                               ["ufficio", "lavoro da casa", "piccole commissioni", "visita", "fisioterapia", "riposo totale", "sociale"])
 
     if st.button("🚀 Calcola e Salva Mattina", use_container_width=True):
-        # Logica Pesi Definitiva
         pesi = {
             "ufficio": -0.5, "lavoro da casa": -0.2, "piccole commissioni": -0.4, 
             "visita": -0.5, "fisioterapia": -0.5, "riposo totale": 0.5, "sociale": -0.7
@@ -125,7 +129,6 @@ with tab_mattina:
         score = 5.0 + (energia * 0.3) + peso_sonno + peso_passi + somma_att + p_temp
         valore_calcolato = round(max(1.0, min(10.0, score)), 1)
         
-        # Congelamento dei dati mattutini nella sessione
         st.session_state.update({
             'mattina_salvata': True,
             'mattina_data': data_sel, 
