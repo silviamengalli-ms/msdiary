@@ -74,18 +74,20 @@ tab_mattina, tab_sera = st.tabs(["🌅 Pianifica la Giornata", "🌌 Feedback Se
 # TAB MATTINA (Pianificazione)
 # ==========================================
 with tab_mattina:
-    data_sel = st.date_input("🗓️ Data:", value=datetime.date.today())
-    posizione_input = st.text_input("📍 Posizione:", value=st.session_state.posizione)
+    
+  
     
     # AGGIORNAMENTO: Passiamo il testo della posizione alla funzione meteo
     temp_api, umidita_api = recupera_meteo(data_sel, posizione_input)
     
     col1, col2 = st.columns(2)
     with col1:
-        temp = st.number_input("🌡️ Temperatura prevista (°C):", value=temp_api)
-        st.number_input(f"💧 Umidità media prevista: {umidita_api}%")
+        data_sel = st.date_input("🗓️ Data:", value=datetime.date.today())
+        posizione_input = st.text_input("📍 Posizione:", value=st.session_state.posizione)
         sonno = st.selectbox("💤 Qualità del sonno:", ["discreta", "soddisfacente", "scarsa"])
     with col2:
+        temp = st.number_input("🌡️ Temperatura prevista (°C):", value=temp_api)
+        st.number_input(f"💧 Umidità media prevista: {umidita_api}%")
         passi = st.selectbox("🚶 Passi previsti:", ["fino a 1000", "da 1001 a 3000", "oltre i 3000"])
         energia = st.slider("⚡ Energia al risveglio (1-10):", 1, 10, 5)
     
