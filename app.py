@@ -50,7 +50,7 @@ def invia_richiesta_con_riconnessione(url, parametri):
             if risposta.status_code == 200:
                 return risposta # Successo!
             elif risposta.status_code == 429:
-                # Se il server è congestionato, aspetta un tempo casuale tra 0.5 e 2 secondi e riprova
+                # Se il server è congestionato, aspetta un tempo casuale e riprova
                 time.sleep(random.uniform(0.5, 2.0))
                 continue
             else:
@@ -133,7 +133,7 @@ with tab_mattina:
     col1, col2 = st.columns(2)
     
     with col1:
-        # 🗓️ FORMATO DATA EUROPEO IMPOSTATO SU "DD/MM/YYYY"
+        # Formato europeo della data (GG/MM/AAAA) abilitato nell'interfaccia
         data_sel = st.date_input("🗓️ Data:", value=datetime.date.today(), format="DD/MM/YYYY")
         posizione_input = st.text_input("📍 Posizione:", value=st.session_state.posizione)
     
@@ -242,4 +242,8 @@ with tab_sera:
                 if r.status_code == 200:
                     st.balloons()
                     st.write("✅ Dati registrati con successo nel tuo diario! Buona notte e sogni d'oro! 🌟")
-                    st.
+                    st.session_state.mattina_salvata = False 
+                else:
+                    st.error(f"❌ Errore di salvataggio (Codice HTTP {r.status_code}). Verifica la configurazione dei campi.")
+            except Exception as e:
+                st.error(f"⚠️ Impossibile raggiungere Google Moduli: {e}")
