@@ -1,6 +1,7 @@
 import streamlit as st
 import datetime
 import requests
+import pandas as pd  # Aggiunto per gestire i dati del grafico orario
 
 # --- CONFIGURAZIONE ---
 st.set_page_config(page_title="La Mia Carica - MS Diary", layout="centered", page_icon="🔋")
@@ -39,10 +40,11 @@ if 'mattina_salvata' not in st.session_state:
         'valore_sem': None
     })
 
-# --- FUNZIONI METEO CON GEOLOCALIZZAZIONE DINAMICA ---
+# --- FUNZIONI METEO AVANZATE (ESTRAZIONE DATI ORARI PER GRAFICO) ---
 @st.cache_data(ttl=3600)
 def recupera_meteo(data, nome_citta):
     try:
+        # 1. GEOCALIZZAZIONE
         url_geo = f"https://geocoding-api.open-meteo.com/v1/search?name={nome_citta}&count=1&language=it&format=json"
         risposta_geo = requests.get(url_geo).json()
         
@@ -51,17 +53,39 @@ def recupera_meteo(data, nome_citta):
             lat = risposta_geo["results"][0]["latitude"]
             lon = risposta_geo["results"][0]["longitude"]
             
+        # 2. RICHIESTA METEO DETTAGLIATA (Oraria + Giornaliera)
         d = data.strftime("%Y-%m-%d")
-        url_meteo = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&start_date={d}&end_date={d}&daily=temperature_2m_max,relative_humidity_2m_mean&timezone=Europe/Rome"
+        url_meteo = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&start_date={d}&end_date={d}&daily=temperature_2m_max&hourly=temperature_2m,relative_humidity_2m&timezone=Europe/Rome"
         resp = requests.get(url_meteo).json()
-        return float(resp['daily']['temperature_2m_max'][0]), int(resp['daily']['relative_humidity_2m_mean'][0])
+        
+        # Dati riassuntivi
+        temp_max = float(resp['daily']['temperature_2m_max'][0])
+        lista_umidita = resp['hourly']['relative_humidity_2m']
+        umidita_media = int(sum(lista_umidita) / len(lista_umidita))
+        
+        # Costruzione della tabella oraria per il grafico
+        ore = [t[-5:] for t in resp['hourly']['time']] # Taglia la data e tiene solo "08:00", "09:00", ecc.
+        df_orario = pd.DataFrame({
+            'Ora': ore,
+            'Temperatura (°C)': resp['hourly']['temperature_2m'],
+            'Umidità (%)': lista_umidita
+        })
+        
+        return temp_max, umidita_media, df_orario
     except: 
-        return 20.0, 50
+        # Fallback in caso di errore o assenza di connessione
+        ore_fittizie = [f"{i:02d}:00" for i in range(24)]
+        df_fallback = pd.DataFrame({
+            'Ora': ore_fittizie,
+            'Temperatura (°C)': [20.0]*24,
+            'Umidità (%)': [50]*24
+        })
+        return 20.0, 50, df_fallback
 
 # --- INTERFACCIA ACCOGLIENTE ---
 st.title("🔋 La Mia Carica")
 st.markdown("---")
-st.markdown("Buongiorno! Prepariamoci per affrontare la giornata 😊")
+st.markdown("Ben svegliata! Prepariamoci per affrontare la giornata 😊")
 
 tab_mattina, tab_sera = st.tabs(["🌅 Pianifica la Mattina", "🌌 Feedback Serale"])
 
@@ -69,24 +93,39 @@ tab_mattina, tab_sera = st.tabs(["🌅 Pianifica la Mattina", "🌌 Feedback Ser
 # TAB MATTINA (Pianificazione)
 # ==========================================
 with tab_mattina:
-    # 1. CREIAMO LE DUE COLONNE PER LA PRIMA RIGA (Data/Luogo vs Meteo)
+    # Righe di input iniziali
     col1, col2 = st.columns(2)
-    
     with col1:
         data_sel = st.date_input("🗓️ Data:", value=datetime.date.today())
         posizione_input = st.text_input("📍 Posizione:", value=st.session_state.posizione)
     
-    # TRUCCO DI COERENZA: Recuperiamo il meteo subito dopo gli input di col1, così col2 ha i dati pronti!
-    temp_api, umidita_api = recupera_meteo(data_sel, posizione_input)
+    # Recupero completo dei dati (incluso il DataFrame del grafico)
+    temp_api, umidita_api, df_meteo = recupera_meteo(data_sel, posizione_input)
     
     with col2:
         temp = st.number_input("🌡️ Temperatura prevista (°C):", value=temp_api)
-        # Sistemata la sintassi dell'input numerico dell'umidità
         umidita = st.number_input("💧 Umidità media prevista (%):", value=int(umidita_api))
     
-    st.markdown("---") # Linea di separazione elegante
+    # --- NUOVA SEZIONE: GRAFICO E METRICHE ---
+    st.markdown("##### 📊 Andamento della giornata (Previsioni orarie)")
+    col_info, col_grafico = st.columns([1, 2]) # 1/3 di spazio alle metriche, 2/3 al grafico
     
-    # 2. DA QUI IN POI IL CODICE È FUORI DALLE COLONNE, QUINDI APPARIRÀ A COLONNA UNICA (TUTTA LARGHEZZA)
+    with col_info:
+        st.metric(label="🌡️ Temp Massima", value=f"{temp_api} °C")
+        st.metric(label="💧 Umidità Media", value=f"{umidita_api} %")
+        
+    with col_grafico:
+        # Selettore discreto per cambiare grafico senza appesantire la pagina
+        scelta_dato = st.radio("Seleziona dato:", ["Temperatura", "Umidità"], horizontal=True, label_visibility="collapsed")
+        
+        if scelta_dato == "Temperatura":
+            st.line_chart(df_meteo, x="Ora", y="Temperatura (°C)", color="#FF4B4B") # Linea Rossa
+        else:
+            st.line_chart(df_meteo, x="Ora", y="Umidità (%)", color="#0068C9") # Linea Blu
+            
+    st.markdown("---") 
+    
+    # Resto dei parametri a colonna unica
     sonno = st.selectbox("💤 Qualità del sonno:", ["discreta", "soddisfacente", "scarsa"])
     passi = st.selectbox("🚶 Passi previsti:", ["fino a 1000", "da 1001 a 3000", "oltre i 3000"])
     energia = st.slider("⚡ Energia al risveglio (1-10):", 1, 10, 5)
@@ -113,13 +152,12 @@ with tab_mattina:
         score = 5.0 + (energia * 0.3) + peso_sonno + peso_passi + somma_att + p_temp
         valore_calcolato = round(max(1.0, min(10.0, score)), 1)
         
-        # Congelamento dei dati mattutini nella sessione
         st.session_state.update({
             'mattina_salvata': True,
             'mattina_data': data_sel, 
             'posizione': posizione_input,
             'temp': temp, 
-            'umidita': umidita, # Usiamo il valore modificabile inserito nel widget
+            'umidita': umidita, 
             'sonno': sonno, 
             'passi': passi, 
             'energia': energia, 
@@ -127,18 +165,20 @@ with tab_mattina:
             'valore_sem': valore_calcolato
         })
         
-
+        st.write("✅ Dati della mattina salvati in memoria! Ci vediamo stasera per vedere com'è andata! Buona giornata")
         st.markdown("---") 
         
         if valore_calcolato <= 4.5:
-            st.error(f"🔴 BOLLINO ROSSO: {valore_calcolato} La tua energia stimata è bassa oggi. Cerca di dare priorità al riposo e non sovraccaricarti 🐢")
+            st.error(f"🔴 BOLLINO ROSSO: {valore_calcolato}")
+            st.write("La tua energia stimata è bassa oggi. Cerca di dare priorità al riposo e non sovraccaricarti. 💪")
         elif valore_calcolato <= 7.0:
-            st.warning(f"🟡 BOLLINO GIALLO: {valore_calcolato} Giornata regolare. Procedi con calma e occhio a non esagerare 🐘")
+            st.warning(f"🟡 BOLLINO GIALLO: {valore_calcolato}")
+            st.write("Giornata regolare. Procedi con calma e ascolta il tuo corpo. 🌼")
         else:
-            st.success(f"🟢 BOLLINO VERDE: {valore_calcolato} Ottimo! Hai una buona carica per affrontare la giornata con serenità 🦋")
+            st.success(f"🟢 BOLLINO VERDE: {valore_calcolato}")
+            st.write("Ottimo! Hai una buona carica per affrontare la giornata con serenità. ✨")
 
 
-        st.write("✅ Dati della mattina salvati in memoria! Ti aspetto stasera per registrare il feedback")
 # ==========================================
 # TAB SERA (Consuntivo e Invio)
 # ==========================================
