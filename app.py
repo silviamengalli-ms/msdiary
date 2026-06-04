@@ -15,9 +15,10 @@ ENTRY_ID = {
     'sonno': 'entry.2076355969',
     'energia': 'entry.1596414247',
     'attivita': 'entry.1595201387',
-    'semaforo': 'entry.625659299',
-    'dolore': 'entry.672372933',
     'passi': 'entry.28384771',
+    'semaforo': 'entry.625659299',
+    'valutazione': 'entry.375319797',
+    'dolore': 'entry.672372933',
     'note': 'entry.158362423'
 }
 
