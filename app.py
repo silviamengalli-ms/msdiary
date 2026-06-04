@@ -53,7 +53,7 @@ def recupera_meteo(data):
 # --- INTERFACCIA ACCOGLIENTE ---
 st.title("🔋 La Mia Carica")
 st.markdown("---")
-st.markdown("Ciao! Prepara la tua giornata e scopri come si prospetta la tua energia. 😊")
+st.markdown("Ben svegliata! Prepariamoci per affrontare la giornata 😊")
 
 tab_mattina, tab_sera = st.tabs(["🌅 Pianifica la Mattina", "🌌 Feedback Serale"])
 
@@ -110,7 +110,7 @@ with tab_mattina:
             'valore_sem': valore_calcolato
         })
         
-        st.success("✅ Dati della mattina salvati in memoria! Stasera potrai completare il report.")
+        st.success("✅ Dati della mattina salvati in memoria! Ci vediamo stasera per vedere com'è andata! Buona giornata")
         
         # Visualizzazione Grafica Semaforo
         if valore_calcolato <= 4.5:
@@ -171,7 +171,7 @@ with tab_sera:
                 r = requests.post(URL_MODULO, data=payload)
                 if r.status_code == 200:
                     st.balloons() # Animazione!
-                    st.success("✅ Dati registrati con successo nel tuo diario definitivo! Buona serata e riposati. 🌟")
+                    st.success("✅ Dati registrati con successo nel tuo diario! Buona notte e sogni d'oro! 🌟")
                     
                     # Sblocca la sessione per il giorno successivo
                     st.session_state.mattina_salvata = False 
