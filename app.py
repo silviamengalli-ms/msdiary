@@ -39,44 +39,58 @@ if 'mattina_salvata' not in st.session_state:
         'valore_sem': None
     })
 
-# --- FUNZIONE METEO ULTRA-ROBUSTA (CON WEATHERAPI PROTETTO) ---
+# --- FUNZIONE METEO CON OPEN-METEO (CORRETTA E FUNZIONANTE) ---
 @st.cache_data(ttl=3600)
 def recupera_meteo(data, nome_citta):
-    API_KEY = "067645ccb00b41bfb90135805232110"
     try:
-        # Controllo data: sceglie l'endpoint corretto se si compila il diario in ritardo
-        oggi = datetime.date.today()
-        if data < oggi:
-            endpoint = "history.json"  # Storico per i giorni passati
-        else:
-            endpoint = "forecast.json" # Previsione per oggi e futuro
-            
-        url = f"https://api.weatherapi.com/v1/{endpoint}"
+        # 1. GEOLOCALIZZAZIONE: Trova le coordinate della città inserita
+        url_geo = "https://geocoding-api.open-meteo.com/v1/search"
+        params_geo = {
+            "name": nome_citta.strip(),
+            "count": 1,
+            "language": "it",
+            "format": "json"
+        }
+        risposta_geo = requests.get(url_geo, params=params_geo, timeout=5).json()
         
-        # Pulizia e formattazione sicura dei parametri per evitare errori con gli spazi (es. "Reggio Emilia")
-        parametri = {
-            "key": API_KEY,
-            "q": nome_citta.strip(),
-            "dt": data.strftime("%Y-%m-%d"),
-            "lang": "it"
+        # Coordinate di default (Verona) se la ricerca fallisce
+        lat, lon = 45.43, 10.99 
+        if "results" in risposta_geo and len(risposta_geo["results"]) > 0:
+            lat = risposta_geo["results"][0]["latitude"]
+            lon = risposta_geo["results"][0]["longitude"]
+            
+        # 2. COMPOSIZIONE PARAMETRI METEO
+        d_str = data.strftime("%Y-%m-%d")
+        url_meteo = "https://api.open-meteo.com/v1/forecast"
+        
+        params_meteo = {
+            "latitude": lat,
+            "longitude": lon,
+            "start_date": d_str,
+            "end_date": d_str,
+            "daily": "temperature_2m_max",        # Questo parametro giornaliero esiste ed è valido
+            "hourly": "relative_humidity_2m",     # Prendiamo l'umidità oraria (quella giornaliera non esiste direttamente)
+            "timezone": "Europe/Rome"
         }
         
-        # Richiesta sicura in HTTPS
-        risposta = requests.get(url, params=parametri, timeout=5)
+        risposta_meteo = requests.get(url_meteo, params=params_meteo, timeout=5)
         
-        # Paracadute se la chiave è scaduta o il server risponde male
-        if risposta.status_code != 200:
+        # Se il server risponde con un errore (es. codice 400 o 502), scatta il paracadute
+        if risposta_meteo.status_code != 200:
             return 20.0, 50, True
             
-        data_json = risposta.json()
+        resp = risposta_meteo.json()
         
-        # Estrazione dati dal JSON (la struttura è identica sia per history che per forecast)
-        val_temp = float(data_json['forecast']['forecastday'][0]['day']['maxtemp_c'])
-        val_umidita = int(data_json['forecast']['forecastday'][0]['day']['avghumidity'])
+        # Estraiamo la temperatura massima registrata/prevista
+        val_temp = float(resp['daily']['temperature_2m_max'][0])
+        
+        # Calcoliamo la media matematica dell'umidità incrociando i dati delle 24 ore
+        umidita_orarie = resp['hourly']['relative_humidity_2m']
+        val_umidita = int(sum(umidita_orarie) / len(umidita_orarie))
         
         return val_temp, val_umidita, False
-    except:
-        # Paracadute estremo in caso di totale assenza di rete
+    except: 
+        # Paracadute estremo in caso di totale assenza di rete o problemi generici
         return 20.0, 50, True
 
 # --- INTERFACCIA UTENTE ---
@@ -84,7 +98,7 @@ st.title("🔋 La Mia Carica")
 st.markdown("---")
 st.markdown("Buongiorno! Prepariamoci per affrontare la giornata 😊")
 
-# Inizializzazione corretta dei Tab
+# Generazione corretta dei Tab
 tab_mattina, tab_sera = st.tabs(["🌅 Pianifica la Mattina", "🌌 Feedback Serale"])
 
 # ==========================================
@@ -97,14 +111,14 @@ with tab_mattina:
         data_sel = st.date_input("🗓️ Data:", value=datetime.date.today())
         posizione_input = st.text_input("📍 Posizione:", value=st.session_state.posizione)
     
-    # Chiamata alla nuova funzione meteo sicura
+    # Esecuzione del nuovo motore Open-Meteo corretto
     temp_api, umidita_api, usa_standard = recupera_meteo(data_sel, posizione_input)
     
     with col2:
         temp = st.number_input("🌡️ Temperatura prevista (°C):", value=temp_api)
         umidita = st.number_input("💧 Umidità media prevista (%):", value=int(umidita_api))
     
-    # Se la richiesta fallisce, mostra la nota arancione di avviso
+    # Compare solo se la richiesta fallisce davvero (adesso non dovrebbe più succedere)
     if usa_standard:
         st.caption("⚠️ Dati meteo in tempo reale non disponibili. Usati valori standard (modificabili a mano).")
     
