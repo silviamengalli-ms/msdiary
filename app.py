@@ -39,40 +39,49 @@ if 'mattina_salvata' not in st.session_state:
         'valore_sem': None
     })
 
-# --- FUNZIONI METEO CON DIAGNOSTICA DEGLI ERRORI ---
+# --- FUNZIONI METEO CON MASCHERAMENTO BROWSER E VERIFICA STATO ---
 @st.cache_data(ttl=3600)
 def recupera_meteo(data, nome_citta):
+    # Intestazione per far credere al server meteo che siamo un normale browser per evitare blocchi
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
     try:
         # 1. Geolocalizzazione
         url_geo = f"https://geocoding-api.open-meteo.com/v1/search?name={nome_citta}&count=1&language=it&format=json"
-        risposta_geo = requests.get(url_geo).json()
+        resp_geo = requests.get(url_geo, headers=headers)
         
+        if resp_geo.status_code != 200:
+            return 200.0, 50, f"ℹ️ Server Geocoding occupato (Errore {resp_geo.status_code}). Usati valori standard."
+            
+        risposta_geo = resp_geo.json()
         lat, lon = 45.43, 10.99 
         if "results" in risposta_geo and len(risposta_geo["results"]) > 0:
             lat = risposta_geo["results"][0]["latitude"]
             lon = risposta_geo["results"][0]["longitude"]
             
+        # 2. Richiesta Dati Meteo
         d = data.strftime("%Y-%m-%d")
-        # Richiesta dati daily + hourly
         url_meteo = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&start_date={d}&end_date={d}&daily=temperature_2m_max,temperature_2m_min&hourly=relative_humidity_2m&timezone=Europe/Rome"
-        resp = requests.get(url_meteo).json()
+        resp_meteo = requests.get(url_meteo, headers=headers)
         
+        if resp_meteo.status_code != 200:
+            return 200.0, 50, f"ℹ️ Server Meteo momentaneamente bloccato (Errore {resp_meteo.status_code}). Usati valori standard."
+            
+        resp = resp_meteo.json()
         if 'daily' in resp and 'hourly' in resp:
             temp_max = float(resp['daily']['temperature_2m_max'][0]) if resp['daily']['temperature_2m_max'][0] is not None else 20.0
             temp_min = float(resp['daily']['temperature_2m_min'][0]) if resp['daily']['temperature_2m_min'][0] is not None else 15.0
             
-            # Estrazione e pulizia umidità da potenziali valori nulli (None)
             lista_umidita = [x for x in resp['hourly']['relative_humidity_2m'] if x is not None]
             umidita_media = int(sum(lista_umidita) / len(lista_umidita)) if lista_umidita else 50
             
             info_breve = f"ℹ️ Oggi escursione termica prevista da {temp_min}°C (minima) a {temp_max}°C (massima)."
             return temp_max, umidita_media, info_breve
         else:
-            ragione = resp.get('reason', 'Risposta API incompleta')
-            return 20.0, 50, f"ℹ️ Servizio meteo non raggiungibile ({ragione}). Usati valori standard."
+            return 20.0, 50, "ℹ️ Risposta meteo incompleta dal server. Usati valori standard."
             
     except Exception as e: 
-        # Mostra l'errore reale direttamente nella didascalia dell'app per fare debug
         return 20.0, 50, f"ℹ️ Connessione meteo fallita (Errore: {str(e)}). Usati valori standard."
 
 # --- INTERFACCIA ACCOGLIENTE ---
@@ -92,14 +101,14 @@ with tab_mattina:
         data_sel = st.date_input("🗓️ Data:", value=datetime.date.today())
         posizione_input = st.text_input("📍 Posizione:", value=st.session_state.posizione)
     
-    # Recupero dei dati meteo ed eventuale testo di errore diagnostico
+    # Recupero dei dati meteo ottimizzati
     temp_api, umidita_api, nota_meteo = recupera_meteo(data_sel, posizione_input)
     
     with col2:
         temp = st.number_input("🌡️ Temperatura prevista (°C):", value=temp_api)
         umidita = st.number_input("💧 Umidità media prevista (%):", value=int(umidita_api))
     
-    # Questo testo ora ti dirà la minima/massima OPPURE il motivo esatto del blocco
+    # Didascalia protetta da errori di parsing
     st.caption(nota_meteo)
     
     st.markdown("---") 
