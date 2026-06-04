@@ -133,7 +133,8 @@ with tab_mattina:
     col1, col2 = st.columns(2)
     
     with col1:
-        data_sel = st.date_input("🗓️ Data:", value=datetime.date.today())
+        # 🗓️ FORMATO DATA EUROPEO IMPOSTATO SU "DD/MM/YYYY"
+        data_sel = st.date_input("🗓️ Data:", value=datetime.date.today(), format="DD/MM/YYYY")
         posizione_input = st.text_input("📍 Posizione:", value=st.session_state.posizione)
     
     # Esecuzione del motore Open-Meteo intelligente
@@ -241,8 +242,4 @@ with tab_sera:
                 if r.status_code == 200:
                     st.balloons()
                     st.write("✅ Dati registrati con successo nel tuo diario! Buona notte e sogni d'oro! 🌟")
-                    st.session_state.mattina_salvata = False 
-                else:
-                    st.error(f"❌ Errore di salvataggio (Codice HTTP {r.status_code}). Verifica la configurazione dei campi.")
-            except Exception as e:
-                st.error(f"⚠️ Impossibile raggiungere Google Moduli: {e}")
+                    st.
