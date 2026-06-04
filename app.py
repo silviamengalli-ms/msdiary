@@ -11,7 +11,7 @@ ENTRY_ID = {
     'data': 'entry.2022449610',
     'posizione': 'entry.1412086707',
     'temp': 'entry.1900939990',
-    'umidita': 'entry.1900939990',
+    'umidita': 'entry.1051612516',
     'sonno': 'entry.2076355969',
     'energia': 'entry.1596414247',
     'attivita': 'entry.1595201387',
