@@ -54,23 +54,21 @@ def recupera_meteo(data, nome_citta):
         d = data.strftime("%Y-%m-%d")
         url_meteo = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&start_date={d}&end_date={d}&daily=temperature_2m_max,relative_humidity_2m_mean&timezone=Europe/Rome"
         
-        # Effettuiamo la chiamata impostando un timeout di sicurezza
         risposta_meteo = requests.get(url_meteo, timeout=5)
         
-        # Se il server meteo risponde male (es. Errore 502), passiamo subito al piano di riserva standard
+        # Se il server meteo risponde male (es. Errore 502), restituisce i valori standard e il flag di avviso
         if risposta_meteo.status_code != 200:
-            return 200.0, 50
+            return 20.0, 50, True
             
         resp = risposta_meteo.json()
         
-        # Estrazione sicura: se i dati mancano o sono corrotti, interviene l'except
         val_temp = float(resp['daily']['temperature_2m_max'][0])
         val_umidita = int(resp['daily']['relative_humidity_2m_mean'][0])
         
-        return val_temp, val_umidita
+        return val_temp, val_umidita, False
     except: 
-        # In caso di qualsiasi errore di rete o server, restituisce i tuoi valori standard senza bloccare l'app
-        return 20.0, 50
+        # In caso di qualsiasi errore, usa i valori standard (20°C) e attiva l'avviso (True)
+        return 20.0, 50, True
 
 # --- INTERFACCIA ACCOGLIENTE ---
 st.title("🔋 La Mia Carica")
@@ -83,24 +81,25 @@ tab_mattina, tab_sera = st.tabs(["🌅 Pianifica la Mattina", "🌌 Feedback Ser
 # TAB MATTINA (Pianificazione)
 # ==========================================
 with tab_mattina:
-    # 1. CREIAMO LE DUE COLONNE PER LA PRIMA RIGA (Data/Luogo vs Meteo)
     col1, col2 = st.columns(2)
     
     with col1:
         data_sel = st.date_input("🗓️ Data:", value=datetime.date.today())
         posizione_input = st.text_input("📍 Posizione:", value=st.session_state.posizione)
     
-    # TRUCCO DI COERENZA: Recuperiamo il meteo subito dopo gli input di col1, così col2 ha i dati pronti!
-    temp_api, umidita_api = recupera_meteo(data_sel, posizione_input)
+    # Recuperiamo temperatura, umidità e il flag che ci dice se stiamo usando i dati standard
+    temp_api, umidita_api, usa_standard = recupera_meteo(data_sel, posizione_input)
     
     with col2:
         temp = st.number_input("🌡️ Temperatura prevista (°C):", value=temp_api)
-        # Sistemata la sintassi dell'input numerico dell'umidità
         umidita = st.number_input("💧 Umidità media prevista (%):", value=int(umidita_api))
     
-    st.markdown("---") # Linea di separazione elegante
+    # Se il sistema ha dovuto usare i valori standard, mostra la nota di avviso
+    if usa_standard:
+        st.caption("⚠️ Dati meteo in tempo reale non disponibili. Usati valori standard (modificabili a mano).")
     
-    # 2. DA QUI IN POI IL CODICE È FUORI DALLE COLONNE, QUINDI APPARIRÀ A COLONNA UNICA (TUTTA LARGHEZZA)
+    st.markdown("---") 
+    
     sonno = st.selectbox("💤 Qualità del sonno:", ["discreta", "soddisfacente", "scarsa"])
     passi = st.selectbox("🚶 Passi previsti:", ["fino a 1000", "da 1001 a 3000", "oltre i 3000"])
     energia = st.slider("⚡ Energia al risveglio (1-10):", 1, 10, 5)
@@ -109,7 +108,6 @@ with tab_mattina:
                               ["ufficio", "lavoro da casa", "piccole commissioni", "visita", "fisioterapia", "riposo totale", "sociale"])
 
     if st.button("🚀 Calcola e Salva Mattina", use_container_width=True):
-        # Logica Pesi Definitiva
         pesi = {
             "ufficio": -0.5, "lavoro da casa": -0.2, "piccole commissioni": -0.4, 
             "visita": -0.5, "fisioterapia": -0.5, "riposo totale": 0.5, "sociale": -0.7
@@ -127,13 +125,12 @@ with tab_mattina:
         score = 5.0 + (energia * 0.3) + peso_sonno + peso_passi + somma_att + p_temp
         valore_calcolato = round(max(1.0, min(10.0, score)), 1)
         
-        # Congelamento dei dati mattutini nella sessione
         st.session_state.update({
             'mattina_salvata': True,
             'mattina_data': data_sel, 
             'posizione': posizione_input,
             'temp': temp, 
-            'umidita': umidita, # Usiamo il valore modificabile inserito nel widget
+            'umidita': umidita, 
             'sonno': sonno, 
             'passi': passi, 
             'energia': energia, 
@@ -141,7 +138,6 @@ with tab_mattina:
             'valore_sem': valore_calcolato
         })
         
-
         st.markdown("---") 
         
         if valore_calcolato <= 4.5:
@@ -151,8 +147,8 @@ with tab_mattina:
         else:
             st.success(f"🟢 BOLLINO VERDE: {valore_calcolato} Ottimo! Hai una buona carica per affrontare la giornata con serenità 🦋")
 
-
         st.write("✅ Dati della mattina salvati in memoria! Ti aspetto stasera per registrare il feedback")
+
 # ==========================================
 # TAB SERA (Consuntivo e Invio)
 # ==========================================
