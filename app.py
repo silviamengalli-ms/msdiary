@@ -39,35 +39,30 @@ if 'mattina_salvata' not in st.session_state:
         'valore_sem': None
     })
 
-# --- FUNZIONI METEO CON GEOLOCALIZZAZIONE DINAMICA (VERSIONE PROTETTA) ---
+# --- NUOVA FUNZIONE METEO CON WEATHERAPI (PIÙ STABILE DI OPEN-METEO) ---
 @st.cache_data(ttl=3600)
 def recupera_meteo(data, nome_citta):
+    # Chiave gratuita di test per WeatherAPI (stabile e veloce)
+    API_KEY = "067645ccb00b41bfb90135805232110"
     try:
-        url_geo = f"https://geocoding-api.open-meteo.com/v1/search?name={nome_citta}&count=1&language=it&format=json"
-        risposta_geo = requests.get(url_geo, timeout=5).json()
+        d_str = data.strftime("%Y-%m-%d")
+        # WeatherAPI fa geolocalizzazione e meteo in un'unica richiesta velocissima
+        url = f"http://api.weatherapi.com/v1/forecast.json?key={API_KEY}&q={nome_citta}&days=1&dt={d_str}&lang=it"
         
-        lat, lon = 45.43, 10.99 
-        if "results" in risposta_geo and len(risposta_geo["results"]) > 0:
-            lat = risposta_geo["results"][0]["latitude"]
-            lon = risposta_geo["results"][0]["longitude"]
-            
-        d = data.strftime("%Y-%m-%d")
-        url_meteo = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&start_date={d}&end_date={d}&daily=temperature_2m_max,relative_humidity_2m_mean&timezone=Europe/Rome"
+        risposta = requests.get(url, timeout=5)
         
-        risposta_meteo = requests.get(url_meteo, timeout=5)
-        
-        # Se il server meteo risponde male (es. Errore 502), restituisce i valori standard e il flag di avviso
-        if risposta_meteo.status_code != 200:
+        if risposta.status_code != 200:
             return 20.0, 50, True
             
-        resp = risposta_meteo.json()
+        data_json = risposta.json()
         
-        val_temp = float(resp['daily']['temperature_2m_max'][0])
-        val_umidita = int(resp['daily']['relative_humidity_2m_mean'][0])
+        # Estraiamo la temperatura massima e l'umidità media del giorno selezionato
+        val_temp = float(data_json['forecast']['forecastday'][0]['day']['maxtemp_c'])
+        val_umidita = int(data_json['forecast']['forecastday'][0]['day']['avghumidity'])
         
         return val_temp, val_umidita, False
-    except: 
-        # In caso di qualsiasi errore, usa i valori standard (20°C) e attiva l'avviso (True)
+    except:
+        # Se anche questo servizio fallisce, scatta il paracadute dei tuoi valori standard
         return 20.0, 50, True
 
 # --- INTERFACCIA ACCOGLIENTE ---
@@ -87,14 +82,14 @@ with tab_mattina:
         data_sel = st.date_input("🗓️ Data:", value=datetime.date.today())
         posizione_input = st.text_input("📍 Posizione:", value=st.session_state.posizione)
     
-    # Recuperiamo temperatura, umidità e il flag che ci dice se stiamo usando i dati standard
+    # Esecuzione del nuovo motore meteo
     temp_api, umidita_api, usa_standard = recupera_meteo(data_sel, posizione_input)
     
     with col2:
         temp = st.number_input("🌡️ Temperatura prevista (°C):", value=temp_api)
         umidita = st.number_input("💧 Umidità media prevista (%):", value=int(umidita_api))
     
-    # Se il sistema ha dovuto usare i valori standard, mostra la nota di avviso
+    # Segnalazione se vengono applicati i valori standard
     if usa_standard:
         st.caption("⚠️ Dati meteo in tempo reale non disponibili. Usati valori standard (modificabili a mano).")
     
@@ -133,7 +128,7 @@ with tab_mattina:
             'umidita': umidita, 
             'sonno': sonno, 
             'passi': passi, 
-            'energia': energia, 
+            'energia': telemetry = energia, 
             'attivita': attivita, 
             'valore_sem': valore_calcolato
         })
