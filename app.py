@@ -68,7 +68,7 @@ st.title("🔋 La Mia Carica")
 st.markdown("---")
 st.markdown("Ben svegliata! Prepariamoci per affrontare la giornata 😊")
 
-tab_mattina, tab_sera = st.tabs(["🌅 Pianifica la Mattina", "🌌 Feedback Serale"])
+tab_mattina, tab_sera = st.tabs(["🌅 Pianifica la Giornata", "🌌 Feedback Serale"])
 
 # ==========================================
 # TAB MATTINA (Pianificazione)
@@ -92,7 +92,7 @@ with tab_mattina:
     attivita = st.multiselect("📅 Attività in programma:", 
                               ["ufficio", "lavoro da casa", "piccole commissioni", "visita", "fisioterapia", "riposo totale", "sociale"])
 
-    if st.button("🚀 Calcola e Salva Mattina", use_container_width=True):
+    if st.button("🚀 Calcola e Salva la Previsione per Oggi", use_container_width=True):
         # Logica Pesi Definitiva
         pesi = {
             "ufficio": -0.5, "lavoro da casa": -0.2, "piccole commissioni": -0.4, 
@@ -125,12 +125,12 @@ with tab_mattina:
             'valore_sem': valore_calcolato
         })
         
-        st.success("✅ Dati della mattina salvati in memoria! Ci vedere stasera per vedere com'è andata! Buona giornata")
+        st.success("✅ Dati della mattina salvati in memoria! Buona giornata")
         
         # Visualizzazione Grafica Semaforo
         if valore_calcolato <= 4.5:
             st.error(f"### 🔴 BOLLINO ROSSO: {valore_calcolato}")
-            st.write("La tua energia stimata è bassa oggi. Cerca di dare priorità al riposo e non sovraccaricarti. 💪")
+            st.write("La tua energia stimata è bassa oggi: cerca di delegare o posticipare qualche attività per non sovraccaricarti. 💪")
         elif valore_calcolato <= 7.0:
             st.warning(f"### 🟡 BOLLINO GIALLO: {valore_calcolato}")
             st.write("Giornata regolare. Procedi con calma e ascolta il tuo corpo. 🌼")
