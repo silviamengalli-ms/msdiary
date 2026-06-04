@@ -138,7 +138,7 @@ with tab_mattina:
             st.success(f"🟢 BOLLINO VERDE: {valore_calcolato} Ottimo! Hai una buona carica per affrontare la giornata con serenità 🦋")
 
 
-        st.write("✅ Dati della mattina salvati in memoria! Vediamoci stasera per registrare il feedback")
+        st.write("✅ Dati della mattina salvati in memoria! Ti aspetto stasera per registrare il feedback")
 # ==========================================
 # TAB SERA (Consuntivo e Invio)
 # ==========================================
