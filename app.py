@@ -43,24 +43,19 @@ if 'mattina_salvata' not in st.session_state:
 @st.cache_data(ttl=3600)
 def recupera_meteo(data, nome_citta):
     try:
-        # 1. GEOCALIZZAZIONE: Cerchiamo le coordinate del nome inserito dall'utente
         url_geo = f"https://geocoding-api.open-meteo.com/v1/search?name={nome_citta}&count=1&language=it&format=json"
         risposta_geo = requests.get(url_geo).json()
         
-        # Coordinate di default (Verona) nel caso in cui la ricerca fallisca
         lat, lon = 45.43, 10.99 
-        
         if "results" in risposta_geo and len(risposta_geo["results"]) > 0:
             lat = risposta_geo["results"][0]["latitude"]
             lon = risposta_geo["results"][0]["longitude"]
             
-        # 2. METEO: Scarichiamo i dati meteo usando le coordinate trovate
         d = data.strftime("%Y-%m-%d")
         url_meteo = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&start_date={d}&end_date={d}&daily=temperature_2m_max,relative_humidity_2m_mean&timezone=Europe/Rome"
         resp = requests.get(url_meteo).json()
         return float(resp['daily']['temperature_2m_max'][0]), int(resp['daily']['relative_humidity_2m_mean'][0])
     except: 
-        # Fallback sicuro in caso di totale assenza di connessione o errore API
         return 20.0, 50
 
 # --- INTERFACCIA ACCOGLIENTE ---
@@ -68,33 +63,38 @@ st.title("🔋 La Mia Carica")
 st.markdown("---")
 st.markdown("Ben svegliata! Prepariamoci per affrontare la giornata 😊")
 
-tab_mattina, tab_sera = st.tabs(["🌅 Pianifica la Giornata", "🌌 Feedback Serale"])
+tab_mattina, tab_sera = st.tabs(["🌅 Pianifica la Mattina", "🌌 Feedback Serale"])
 
 # ==========================================
 # TAB MATTINA (Pianificazione)
 # ==========================================
 with tab_mattina:
-    
-  
-    
-    # AGGIORNAMENTO: Passiamo il testo della posizione alla funzione meteo
-    temp_api, umidita_api = recupera_meteo(data_sel, posizione_input)
-    
+    # 1. CREIAMO LE DUE COLONNE PER LA PRIMA RIGA (Data/Luogo vs Meteo)
     col1, col2 = st.columns(2)
+    
     with col1:
         data_sel = st.date_input("🗓️ Data:", value=datetime.date.today())
         posizione_input = st.text_input("📍 Posizione:", value=st.session_state.posizione)
-        sonno = st.selectbox("💤 Qualità del sonno:", ["discreta", "soddisfacente", "scarsa"])
+    
+    # TRUCCO DI COERENZA: Recuperiamo il meteo subito dopo gli input di col1, così col2 ha i dati pronti!
+    temp_api, umidita_api = recupera_meteo(data_sel, posizione_input)
+    
     with col2:
         temp = st.number_input("🌡️ Temperatura prevista (°C):", value=temp_api)
-        st.number_input(f"💧 Umidità media prevista: {umidita_api}%")
-        passi = st.selectbox("🚶 Passi previsti:", ["fino a 1000", "da 1001 a 3000", "oltre i 3000"])
-        energia = st.slider("⚡ Energia al risveglio (1-10):", 1, 10, 5)
+        # Sistemata la sintassi dell'input numerico dell'umidità
+        umidita = st.number_input("💧 Umidità media prevista (%):", value=int(umidita_api))
+    
+    st.markdown("---") # Linea di separazione elegante
+    
+    # 2. DA QUI IN POI IL CODICE È FUORI DALLE COLONNE, QUINDI APPARIRÀ A COLONNA UNICA (TUTTA LARGHEZZA)
+    sonno = st.selectbox("💤 Qualità del sonno:", ["discreta", "soddisfacente", "scarsa"])
+    passi = st.selectbox("🚶 Passi previsti:", ["fino a 1000", "da 1001 a 3000", "oltre i 3000"])
+    energia = st.slider("⚡ Energia al risveglio (1-10):", 1, 10, 5)
     
     attivita = st.multiselect("📅 Attività in programma:", 
                               ["ufficio", "lavoro da casa", "piccole commissioni", "visita", "fisioterapia", "riposo totale", "sociale"])
 
-    if st.button("🚀 Calcola e Salva la Previsione per Oggi", use_container_width=True):
+    if st.button("🚀 Calcola e Salva Mattina", use_container_width=True):
         # Logica Pesi Definitiva
         pesi = {
             "ufficio": -0.5, "lavoro da casa": -0.2, "piccole commissioni": -0.4, 
@@ -103,9 +103,9 @@ with tab_mattina:
         
         somma_att = sum([pesi[a] for a in attivita])
         if len(attivita) > 1:
-            somma_att += (len(attivita) - 1) * -0.3 # Effetto penalità cumulativa
+            somma_att += (len(attivita) - 1) * -0.3
             
-        p_temp = 0.0 if temp < 28.0 else -0.5 - ((temp - 28.0) * 0.3) # Penalità caldo
+        p_temp = 0.0 if temp < 28.0 else -0.5 - ((temp - 28.0) * 0.3)
         
         peso_sonno = {"discreta": 0.0, "soddisfacente": 1.0, "scarsa": -1.5}[sonno]
         peso_passi = {"fino a 1000": 0.5, "da 1001 a 3000": 0.0, "oltre i 3000": -0.3}[passi]
@@ -117,9 +117,9 @@ with tab_mattina:
         st.session_state.update({
             'mattina_salvata': True,
             'mattina_data': data_sel, 
-            'posizione': posizione_input, # Salva la città corretta inserita
+            'posizione': posizione_input,
             'temp': temp, 
-            'umidita': umidita_api, 
+            'umidita': umidita, # Usiamo il valore modificabile inserito nel widget
             'sonno': sonno, 
             'passi': passi, 
             'energia': energia, 
@@ -127,16 +127,19 @@ with tab_mattina:
             'valore_sem': valore_calcolato
         })
         
+        st.write("✅ Dati della mattina salvati in memoria! Ci vediamo stasera per vedere com'è andata! Buona giornata")
+        st.markdown("---") 
         
-        # Visualizzazione Grafica Semaforo
         if valore_calcolato <= 4.5:
-            st.error(f" 🔴 BOLLINO ROSSO: {valore_calcolato} - La tua energia stimata è bassa oggi: cerca di delegare o posticipare qualche attività per non sovraccaricarti 🐢")
+            st.error(f"🔴 BOLLINO ROSSO: {valore_calcolato}")
+            st.write("La tua energia stimata è bassa oggi. Cerca di dare priorità al riposo e non sovraccaricarti. 💪")
         elif valore_calcolato <= 7.0:
-            st.warning(f" 🟡 BOLLINO GIALLO: {valore_calcolato}  - Giornata regolare. Procedi con calma e ascolta il tuo corpo 🐘")
+            st.warning(f"🟡 BOLLINO GIALLO: {valore_calcolato}")
+            st.write("Giornata regolare. Procedi con calma e ascolta il tuo corpo. 🌼")
         else:
-            st.success(f" 🟢 BOLLINO VERDE: {valore_calcolato} - Ottimo! Hai una buona carica per affrontare la giornata con serenità 🦋")
+            st.success(f"🟢 BOLLINO VERDE: {valore_calcolato}")
+            st.write("Ottimo! Hai una buona carica per affrontare la giornata con serenità. ✨")
 
-        st.write("✅ Dati della mattina salvati in memoria! Buona giornata")
 
 # ==========================================
 # TAB SERA (Consuntivo e Invio)
@@ -180,7 +183,7 @@ with tab_sera:
                 r = requests.post(URL_MODULO, data=payload)
                 if r.status_code == 200:
                     st.balloons()
-                    st.success("✅ Dati registrati con successo nel tuo diario! Buona notte e sogni d'oro! 🌟")
+                    st.write("✅ Dati registrati con successo nel tuo diario! Buona notte e sogni d'oro! 🌟")
                     st.session_state.mattina_salvata = False 
                 else:
                     st.error(f"❌ Errore di salvataggio (Codice HTTP {r.status_code}). Verifica la configurazione dei campi.")
