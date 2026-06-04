@@ -58,7 +58,7 @@ def recupera_meteo(data, nome_citta):
                 lat = risposta_geo["results"][0]["latitude"]
                 lon = risposta_geo["results"][0]["longitude"]
                 
-            d = data.strftime("%Y-%m-%d")
+            d = data.strftime("%d-%m-%Y")
             url_meteo = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&start_date={d}&end_date={d}&daily=temperature_2m_max,temperature_2m_min&hourly=relative_humidity_2m&timezone=Europe/Rome"
             resp_meteo = requests.get(url_meteo, headers=headers, timeout=5)
             
