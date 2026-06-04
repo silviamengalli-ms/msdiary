@@ -129,14 +129,11 @@ with tab_mattina:
         
         # Visualizzazione Grafica Semaforo
         if valore_calcolato <= 4.5:
-            st.error(f" 🔴 BOLLINO ROSSO: {valore_calcolato}")
-            st.write("La tua energia stimata è bassa oggi: cerca di delegare o posticipare qualche attività per non sovraccaricarti. 💪")
+            st.error(f" 🔴 BOLLINO ROSSO: {valore_calcolato} - La tua energia stimata è bassa oggi: cerca di delegare o posticipare qualche attività per non sovraccaricarti. 💪")
         elif valore_calcolato <= 7.0:
-            st.warning(f" 🟡 BOLLINO GIALLO: {valore_calcolato} Giornata regolare. Procedi con calma e ascolta il tuo corpo.")
-            st.write("Giornata regolare. Procedi con calma e ascolta il tuo corpo. 🌼")
+            st.warning(f" 🟡 BOLLINO GIALLO: {valore_calcolato}  - Giornata regolare. Procedi con calma e ascolta il tuo corpo.")
         else:
-            st.success(f" 🟢 BOLLINO VERDE: {valore_calcolato}")
-            st.write("Ottimo! Hai una buona carica per affrontare la giornata con serenità. ✨")
+            st.success(f" 🟢 BOLLINO VERDE: {valore_calcolato} - Ottimo! Hai una buona carica per affrontare la giornata con serenità. ✨")
 
 
 # ==========================================
