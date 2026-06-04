@@ -39,12 +39,12 @@ if 'mattina_salvata' not in st.session_state:
         'valore_sem': None
     })
 
-# --- FUNZIONI METEO CON GEOLOCALIZZAZIONE DINAMICA ---
+# --- FUNZIONI METEO CON GEOLOCALIZZAZIONE DINAMICA (VERSIONE PROTETTA) ---
 @st.cache_data(ttl=3600)
 def recupera_meteo(data, nome_citta):
     try:
         url_geo = f"https://geocoding-api.open-meteo.com/v1/search?name={nome_citta}&count=1&language=it&format=json"
-        risposta_geo = requests.get(url_geo).json()
+        risposta_geo = requests.get(url_geo, timeout=5).json()
         
         lat, lon = 45.43, 10.99 
         if "results" in risposta_geo and len(risposta_geo["results"]) > 0:
@@ -53,9 +53,23 @@ def recupera_meteo(data, nome_citta):
             
         d = data.strftime("%Y-%m-%d")
         url_meteo = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&start_date={d}&end_date={d}&daily=temperature_2m_max,relative_humidity_2m_mean&timezone=Europe/Rome"
-        resp = requests.get(url_meteo).json()
-        return float(resp['daily']['temperature_2m_max'][0]), int(resp['daily']['relative_humidity_2m_mean'][0])
+        
+        # Effettuiamo la chiamata impostando un timeout di sicurezza
+        risposta_meteo = requests.get(url_meteo, timeout=5)
+        
+        # Se il server meteo risponde male (es. Errore 502), passiamo subito al piano di riserva standard
+        if risposta_meteo.status_code != 200:
+            return 200.0, 50
+            
+        resp = risposta_meteo.json()
+        
+        # Estrazione sicura: se i dati mancano o sono corrotti, interviene l'except
+        val_temp = float(resp['daily']['temperature_2m_max'][0])
+        val_umidita = int(resp['daily']['relative_humidity_2m_mean'][0])
+        
+        return val_temp, val_umidita
     except: 
+        # In caso di qualsiasi errore di rete o server, restituisce i tuoi valori standard senza bloccare l'app
         return 20.0, 50
 
 # --- INTERFACCIA ACCOGLIENTE ---
