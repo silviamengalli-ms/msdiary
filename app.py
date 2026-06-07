@@ -173,3 +173,29 @@ with tab_sera:
                 ENTRY_ID['dolore']: str(int(dolore)), ENTRY_ID['note']: note_finali
             }
             if st.session_state.attivita: payload[ENTRY_ID['attivita']] = st
+
+# ==========================================
+# TAB STATISTICHE (Versione Diagnostica di Test)
+# ==========================================
+with tab_stats:
+    st.subheader("📊 Test di Diagnostica del Diario")
+    st.write("🔍 [Punto 1] Il Tab si apre correttamente!")
+    
+    try:
+        st.write("🔄 [Punto 2] Tento il collegamento con il Foglio Google...")
+        df = pd.read_csv(URL_FOGLIO_DATI)
+        
+        st.write("✅ [Punto 3] Foglio letto con successo!")
+        st.write(f"📈 Numero totale di righe trovate nel database: **{len(df)}**")
+        
+        if df.empty:
+            st.warning("Il foglio è stato letto ma sembra non avere dati all'interno.")
+        else:
+            st.write("📋 [Punto 4] Ecco i nomi delle colonne che ho trovato nel tuo foglio:")
+            st.write(list(df.columns))
+            
+            st.write("👇 [Punto 5] Provo a mostrarti una tabella semplice dei tuoi dati (Senza grafici):")
+            st.dataframe(df.head(5))
+            
+    except Exception as e:
+        st.error(f"❌ Errore intercettato durante il test: {e}")
