@@ -175,27 +175,78 @@ with tab_sera:
             if st.session_state.attivita: payload[ENTRY_ID['attivita']] = st
 
 # ==========================================
-# TAB STATISTICHE (Versione Diagnostica di Test)
+# TAB STATISTICHE (Versione Definitiva con i tuoi Grafici!)
 # ==========================================
 with tab_stats:
-    st.subheader("📊 Test di Diagnostica del Diario")
-    st.write("🔍 [Punto 1] Il Tab si apre correttamente!")
+    st.subheader("📊 Analisi Visiva del tuo Diario")
     
     try:
-        st.write("🔄 [Punto 2] Tento il collegamento con il Foglio Google...")
+        # Caricamento dati in tempo reale dal tuo Foglio Google
         df = pd.read_csv(URL_FOGLIO_DATI)
         
-        st.write("✅ [Punto 3] Foglio letto con successo!")
-        st.write(f"📈 Numero totale di righe trovate nel database: **{len(df)}**")
-        
         if df.empty:
-            st.warning("Il foglio è stato letto ma sembra non avere dati all'interno.")
+            st.warning("Il database è ancora vuoto. Inizia a registrare qualche giornata!")
         else:
-            st.write("📋 [Punto 4] Ecco i nomi delle colonne che ho trovato nel tuo foglio:")
-            st.write(list(df.columns))
+            st.success(f"📈 Database sincronizzato! Trovate {len(df)} giornate tracciate nell'ultimo mese.")
             
-            st.write("👇 [Punto 5] Provo a mostrarti una tabella semplice dei tuoi dati (Senza grafici):")
-            st.dataframe(df.head(5))
+            # Assegniamo i nomi esatti delle tue colonne rilevati dalla diagnostica
+            col_data = "Data"
+            col_energia = "Energia al risveglio"
+            col_dolore = "livello indolenzimento/dolore"
+            col_semaforo = "semaforo energetico"
             
+            # --- 1. GRAFICO A TORTA DEI BOLLINI ---
+            st.markdown("### 🍕 Distribuzione dei Carichi Giornalieri (Bollini)")
+            
+            if col_semaforo in df.columns:
+                # Funzione interna per mappare i tuoi punteggi numerici nelle 3 categorie visive
+                def assegna_colore(score):
+                    try:
+                        val = float(score)
+                        if val <= 4.5: return '🔴 Rosso (Bassa Carica)'
+                        elif val <= 7.0: return '🟡 Giallo (Stabile)'
+                        else: return '🟢 Verde (Buona Carica)'
+                    except: return 'Dato non valido'
+                
+                df['Categoria_Semaforo'] = df[col_semaforo].apply(assegna_colore)
+                conteggio_bollini = df['Categoria_Semaforo'].value_counts().reset_index()
+                conteggio_bollini.columns = ['Stato', 'Giorni']
+                
+                fig_torta = px.pie(
+                    conteggio_bollini, 
+                    names='Stato', 
+                    values='Giorni',
+                    color='Stato',
+                    color_discrete_map={
+                        '🔴 Rosso (Bassa Carica)': '#ff4b4b',
+                        '🟡 Giallo (Stabile)': '#ffa500',
+                        '🟢 Verde (Buona Carica)': '#00c853'
+                    },
+                    hole=0.3 # Effetto ciambella moderno
+                )
+                st.plotly_chart(fig_torta, use_container_width=True)
+            else:
+                st.error(f"Non trovo la colonna '{col_semaforo}'")
+
+            st.markdown("---")
+
+            # --- 2. TREND LINEARE (ENERGIA VS DOLORE) ---
+            st.markdown("### 📈 Andamento Temporale: Energia vs Dolore")
+            
+            if col_data in df.columns and col_energia in df.columns and col_dolore in df.columns:
+                # Creiamo una copia pulita e convertiamo i testi in numeri per evitare errori nel grafico
+                df_trend = df[[col_data, col_energia, col_dolore]].copy()
+                df_trend[col_energia] = pd.to_numeric(df_trend[col_energia], errors='coerce')
+                df_trend[col_dolore] = pd.to_numeric(df_trend[col_dolore], errors='coerce')
+                
+                # Rinominiamo per una lettura più pulita sull'interfaccia
+                df_trend.columns = ['Data', 'Energia al Risveglio', 'Livello Dolore']
+                
+                # Generazione del grafico lineare nativo di Streamlit
+                st.line_chart(df_trend.set_index('Data'))
+                st.caption("Il grafico mostra l'andamento affiancato dell'energia mattutina (linea blu) e del dolore serale (linea rossa) giorno dopo giorno.")
+            else:
+                st.error("Verifica che le colonne Data, Energia o Dolore siano presenti nel foglio.")
+                
     except Exception as e:
-        st.error(f"❌ Errore intercettato durante il test: {e}")
+        st.error(f"⚠️ Errore nel caricamento dei grafici: {e}")
