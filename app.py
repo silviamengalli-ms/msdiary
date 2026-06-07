@@ -175,78 +175,70 @@ with tab_sera:
             if st.session_state.attivita: payload[ENTRY_ID['attivita']] = st
 
 # ==========================================
-# TAB STATISTICHE (Versione Definitiva con i tuoi Grafici!)
+# TAB STATISTICHE (Versione Ottimizzata: Mattina vs Sera)
 # ==========================================
 with tab_stats:
-    st.subheader("📊 Analisi Visiva del tuo Diario")
+    st.subheader("📊 Consapevolezza del Diario: Previsione vs Vissuto")
     
     try:
-        # Caricamento dati in tempo reale dal tuo Foglio Google
         df = pd.read_csv(URL_FOGLIO_DATI)
         
         if df.empty:
-            st.warning("Il database è ancora vuoto. Inizia a registrare qualche giornata!")
+            st.warning("Il database è ancora vuoto. Registra qualche giornata per sbloccare l'analisi!")
         else:
-            st.success(f"📈 Database sincronizzato! Trovate {len(df)} giornate tracciate nell'ultimo mese.")
+            st.success(f"📈 Sincronizzato! Analisi basata su {len(df)} giornate registrate.")
             
-            # Assegniamo i nomi esatti delle tue colonne rilevati dalla diagnostica
+            # Mappatura delle colonne reali del tuo foglio
             col_data = "Data"
             col_energia = "Energia al risveglio"
-            col_dolore = "livello indolenzimento/dolore"
-            col_semaforo = "semaforo energetico"
+            col_riscontro = "riscontro"
             
-            # --- 1. GRAFICO A TORTA DEI BOLLINI ---
-            st.markdown("### 🍕 Distribuzione dei Carichi Giornalieri (Bollini)")
+            # --- 1. ANALISI DELL'AFFIDABILITÀ DEI BOLLINI (RISCONTRO) ---
+            st.markdown("### 🎯 Quante volte la previsione del mattino era corretta?")
+            st.markdown("*Questo grafico mostra quanto la stima del mattino ha rispecchiato la tua giornata reale secondo i tuoi feedback serali.*")
             
-            if col_semaforo in df.columns:
-                # Funzione interna per mappare i tuoi punteggi numerici nelle 3 categorie visive
-                def assegna_colore(score):
-                    try:
-                        val = float(score)
-                        if val <= 4.5: return '🔴 Rosso (Bassa Carica)'
-                        elif val <= 7.0: return '🟡 Giallo (Stabile)'
-                        else: return '🟢 Verde (Buona Carica)'
-                    except: return 'Dato non valido'
+            if col_riscontro in df.columns:
+                # Pulizia del dato (rimuove spazi bianchi)
+                df[col_riscontro] = df[col_riscontro].astype(str).str.strip()
                 
-                df['Categoria_Semaforo'] = df[col_semaforo].apply(assegna_colore)
-                conteggio_bollini = df['Categoria_Semaforo'].value_counts().reset_index()
-                conteggio_bollini.columns = ['Stato', 'Giorni']
+                conteggio_riscontri = df[col_riscontro].value_counts().reset_index()
+                conteggio_riscontri.columns = ['Giudizio Serale', 'Giorni']
                 
-                fig_torta = px.pie(
-                    conteggio_bollini, 
-                    names='Stato', 
+                # Creazione del grafico a torta basato sul vissuto della sera
+                fig_riscontro = px.pie(
+                    conteggio_riscontri, 
+                    names='Giudizio Serale', 
                     values='Giorni',
-                    color='Stato',
+                    color='Giudizio Serale',
                     color_discrete_map={
-                        '🔴 Rosso (Bassa Carica)': '#ff4b4b',
-                        '🟡 Giallo (Stabile)': '#ffa500',
-                        '🟢 Verde (Buona Carica)': '#00c853'
+                        'Match': '#00c853',           # Verde: Previsione azzeccata
+                        'Overestimated': '#ff4b4b',   # Rosso: La giornata è stata più faticosa del previsto
+                        'Underestimated': '#ffa500'   # Arancione: La giornata è andata meglio del previsto
                     },
-                    hole=0.3 # Effetto ciambella moderno
+                    hole=0.4
                 )
-                st.plotly_chart(fig_torta, use_container_width=True)
+                st.plotly_chart(fig_riscontro, use_container_width=True)
             else:
-                st.error(f"Non trovo la colonna '{col_semaforo}'")
+                st.error(f"Non trovo la colonna '{col_riscontro}' nel foglio.")
 
             st.markdown("---")
 
-            # --- 2. TREND LINEARE (ENERGIA VS DOLORE) ---
-            st.markdown("### 📈 Andamento Temporale: Energia vs Dolore")
+            # --- 2. ANDAMENTO DELL'ENERGIA MATTUTINA ---
+            st.markdown("### 📈 Andamento dell'Energia al Risveglio")
+            st.markdown("*Monitora come fluttua la tua carica iniziale giorno dopo giorno.*")
             
-            if col_data in df.columns and col_energia in df.columns and col_dolore in df.columns:
-                # Creiamo una copia pulita e convertiamo i testi in numeri per evitare errori nel grafico
-                df_trend = df[[col_data, col_energia, col_dolore]].copy()
-                df_trend[col_energia] = pd.to_numeric(df_trend[col_energia], errors='coerce')
-                df_trend[col_dolore] = pd.to_numeric(df_trend[col_dolore], errors='coerce')
+            if col_data in df.columns and col_energia in df.columns:
+                df_energia = df[[col_data, col_energia]].copy()
+                df_energia[col_energia] = pd.to_numeric(df_energia[col_energia], errors='coerce')
                 
-                # Rinominiamo per una lettura più pulita sull'interfaccia
-                df_trend.columns = ['Data', 'Energia al Risveglio', 'Livello Dolore']
+                # Rinominiamo la colonna per l'interfaccia grafico
+                df_energia.columns = ['Data', 'Energia al Mattino']
                 
-                # Generazione del grafico lineare nativo di Streamlit
-                st.line_chart(df_trend.set_index('Data'))
-                st.caption("Il grafico mostra l'andamento affiancato dell'energia mattutina (linea blu) e del dolore serale (linea rossa) giorno dopo giorno.")
+                # Grafico lineare dell'energia
+                st.line_chart(df_energia.set_index('Data'))
+                st.caption("Tracciando solo l'energia, puoi osservare se ci sono cicli o pattern ripetitivi nei tuoi risvegli.")
             else:
-                st.error("Verifica che le colonne Data, Energia o Dolore siano presenti nel foglio.")
+                st.error("Verifica la presenza delle colonne Data ed Energia nel tuo foglio.")
                 
     except Exception as e:
         st.error(f"⚠️ Errore nel caricamento dei grafici: {e}")
