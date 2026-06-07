@@ -21,6 +21,7 @@ ENTRY_ID = {
     'attivita': 'entry.1595201387',
     'passi': 'entry.28384771',
     'semaforo': 'entry.625659299',
+    'siesta_form': 'entry.1353678088', # <-- NUOVO CAMPO APPOSITI
     'dolore': 'entry.672372933',
     'valutazione': 'entry.2023032977',
     'note': 'entry.158362423'
@@ -38,19 +39,19 @@ if 'mattina_salvata' not in st.session_state:
         'passi': 'da 1001 a 3000', 
         'energia': 5, 
         'attivita': [], 
+        'siesta': False,  
         'valore_sem': None
     })
 
 # --- FUNZIONE AUSILIARIA PER GESTIRE IL TRAFFICO (RETRY LOGIC) ---
 def invia_richiesta_con_riconnessione(url, parametri):
     """Invia una richiesta e se trova 'troppo traffico (429)' riprova dopo una breve pausa"""
-    for tentativo in range(3): # Ci prova fino a 3 volte
+    for tentativo in range(3): 
         try:
             risposta = requests.get(url, params=parametri, timeout=5)
             if risposta.status_code == 200:
-                return risposta # Successo!
+                return risposta 
             elif risposta.status_code == 429:
-                # Se il server è congestionato, aspetta un tempo casuale e riprova
                 time.sleep(random.uniform(0.5, 2.0))
                 continue
             else:
@@ -63,7 +64,6 @@ def invia_richiesta_con_riconnessione(url, parametri):
 @st.cache_data(ttl=60)
 def recupera_meteo(data, nome_citta):
     try:
-        # 1. GEOLOCALIZZAZIONE (Trova le coordinate della città)
         url_geo = "https://geocoding-api.open-meteo.com/v1/search"
         params_geo = {
             "name": nome_citta.strip(),
@@ -73,24 +73,20 @@ def recupera_meteo(data, nome_citta):
         }
         
         risposta_geo = invia_richiesta_con_riconnessione(url_geo, params_geo)
-        
         if not risposta_geo or risposta_geo.status_code != 200:
             errore = risposta_geo.text if risposta_geo else "Timeout di rete"
-            return 20.0, 50, f"Geocoding non riuscito (Server occupato): {errore}"
+            return 20.0, 50, f"Geocoding non riuscito: {errore}"
             
         data_geo = risposta_geo.json()
-        
-        lat, lon = 45.43, 10.99 # Default Verona se non trova nulla
+        lat, lon = 45.43, 10.99
         if "results" in data_geo and len(data_geo["results"]) > 0:
             lat = data_geo["results"][0]["latitude"]
             lon = data_geo["results"][0]["longitude"]
         else:
-            return 20.0, 50, f"Città '{nome_citta}' non trovata. Controlla come è scritta."
+            return 20.0, 50, f"Città '{nome_citta}' non trovata."
             
-        # 2. RICHIESTA DATI METEO REALI
         d_str = data.strftime("%Y-%m-%d")
         url_meteo = "https://api.open-meteo.com/v1/forecast"
-        
         params_meteo = {
             "latitude": lat,
             "longitude": lon,
@@ -102,22 +98,19 @@ def recupera_meteo(data, nome_citta):
         }
         
         risposta_meteo = invia_richiesta_con_riconnessione(url_meteo, params_meteo)
-        
         if not risposta_meteo or risposta_meteo.status_code != 200:
             errore = risposta_meteo.text if risposta_meteo else "Timeout di rete"
-            return 20.0, 50, f"Meteo non disponibile (Server occupato dopo 3 tentativi): {errore}"
+            return 20.0, 50, f"Meteo non disponibile: {errore}"
             
         resp = risposta_meteo.json()
-        
-        # Estrazione e calcolo della media umidità
         val_temp = float(resp['daily']['temperature_2m_max'][0])
         umidita_orarie = resp['hourly']['relative_humidity_2m']
         val_umidita = int(sum(umidita_orarie) / len(umidita_orarie))
         
-        return val_temp, val_umidita, None # Tutto funzionante!
+        return val_temp, val_umidita, None
         
     except Exception as e: 
-        return 20.0, 50, f"Errore imprevisto nel sistema: {str(e)}"
+        return 20.0, 50, f"Errore imprevisto: {str(e)}"
 
 # --- INTERFACCIA UTENTE ---
 st.title("🔋 La Mia Carica")
@@ -133,21 +126,17 @@ with tab_mattina:
     col1, col2 = st.columns(2)
     
     with col1:
-        # Formato europeo della data (GG/MM/AAAA) abilitato nell'interfaccia
         data_sel = st.date_input("🗓️ Data:", value=datetime.date.today(), format="DD/MM/YYYY")
         posizione_input = st.text_input("📍 Posizione:", value=st.session_state.posizione)
     
-    # Esecuzione del motore Open-Meteo intelligente
     temp_api, umidita_api, errore_rilevato = recupera_meteo(data_sel, posizione_input)
     
     with col2:
         temp = st.number_input("🌡️ Temperatura massima prevista per oggi (°C):", value=temp_api)
         umidita = st.number_input("💧 Umidità media prevista (%):", value=int(umidita_api))
     
-    # Se il server fallisce tutti e 3 i tentativi, mostra un avviso ma ti fa andare avanti
     if errore_rilevato:
         st.warning("⚠️ Centralina meteo momentaneamente sovraccarica. Aggiorna la pagina o modifica i dati a mano per salvare!")
-        st.caption(f"Dettaglio tecnico per controllo: {errore_rilevato}")
     
     st.markdown("---") 
     
@@ -155,8 +144,11 @@ with tab_mattina:
     passi = st.selectbox("🚶 Passi previsti:", ["fino a 1000", "da 1001 a 3000", "oltre 3000"])
     energia = st.slider("⚡ Energia al risveglio (1-10):", 1, 10, 5)
     
+    # Checkbox per la siesta programmata come efficace
+    siesta = st.checkbox("🛌 Pianifico una siesta strategica/efficace oggi", value=st.session_state.siesta)
+    
     attivita = st.multiselect("📅 Attività in programma:", 
-                              ["ufficio", "lavoro da casa", "piccole commissioni", "visita", "fisioterapia", "riposo totale", "sociale"])
+                             ["ufficio", "lavoro da casa", "piccole commissioni", "visita", "fisioterapia", "riposo totale", "sociale"])
 
     if st.button("🚀 Calcola e Salva Mattina", use_container_width=True):
         pesi = {
@@ -173,7 +165,13 @@ with tab_mattina:
         peso_sonno = {"discreta": 0.0, "soddisfacente": 1.0, "scarsa": -1.5}[sonno]
         peso_passi = {"fino a 1000": 0.5, "da 1001 a 3000": 0.0, "oltre 3000": -0.3}[passi]
         
+        # Calcolo base
         score = 5.0 + (energia * 0.3) + peso_sonno + peso_passi + somma_att + p_temp
+        
+        # BONUS SIESTA BILANCIATO A 0.3
+        if siesta:
+            score += 0.3
+        
         valore_calcolato = round(max(1.0, min(10.0, score)), 1)
         
         st.session_state.update({
@@ -186,6 +184,7 @@ with tab_mattina:
             'passi': passi, 
             'energia': energia, 
             'attivita': attivita, 
+            'siesta': siesta,  
             'valore_sem': valore_calcolato
         })
         
@@ -218,6 +217,9 @@ with tab_sera:
             stringa_attivita_completa = ", ".join(st.session_state.attivita) if st.session_state.attivita else "Nessuna"
             note_finali = f"[Attività svolte: {stringa_attivita_completa}] {note}".strip()
             
+            # Se la scala del semaforo sul tuo modulo Google arriva a 5, imposta il 'min(10' a 'min(5'
+            semaforo_protetto = max(1, min(10, int(round(st.session_state.valore_sem))))
+            
             payload = {
                 ENTRY_ID['data']: st.session_state.mattina_data.strftime("%d/%m/%Y"),
                 ENTRY_ID['posizione']: st.session_state.posizione,
@@ -226,7 +228,8 @@ with tab_sera:
                 ENTRY_ID['sonno']: st.session_state.sonno,
                 ENTRY_ID['energia']: str(int(st.session_state.energia)),
                 ENTRY_ID['passi']: st.session_state.passi,
-                ENTRY_ID['semaforo']: str(int(round(st.session_state.valore_sem))),
+                ENTRY_ID['semaforo']: str(semaforo_protetto),
+                ENTRY_ID['siesta_form']: "si" if st.session_state.siesta else "no", # <-- INVIO DATO NATIVO
                 ENTRY_ID['valutazione']: valutazione,
                 ENTRY_ID['dolore']: str(int(dolore)),
                 ENTRY_ID['note']: note_finali
