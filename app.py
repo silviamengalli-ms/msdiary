@@ -171,7 +171,7 @@ with tab_mattina:
         p_temp = 0.0 if temp < 28.0 else -0.5 - ((temp - 28.0) * 0.3)
         
         peso_sonno = {"discreta": 0.0, "soddisfacente": 1.0, "scarsa": -1.5}[sonno]
-        peso_passi = {"fino a 1000": 0.5, "da 1001 a 3000": 0.0, "oltre i 3000": -0.3}[passi]
+        peso_passi = {"fino a 1000": 0.5, "da 1001 a 3000": 0.0, "oltre 3000": -0.3}[passi]
         
         score = 5.0 + (energia * 0.3) + peso_sonno + peso_passi + somma_att + p_temp
         valore_calcolato = round(max(1.0, min(10.0, score)), 1)
