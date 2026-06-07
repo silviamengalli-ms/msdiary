@@ -1,4 +1,4 @@
-import streamlit as st
+ import streamlit as st
 import datetime
 import requests
 import time
@@ -50,6 +50,7 @@ def invia_richiesta_con_riconnessione(url, parametri):
             if risposta.status_code == 200:
                 return risposta # Successo!
             elif risposta.status_code == 429:
+                # Se il server è congestionato, aspetta un tempo casuale e riprova
                 time.sleep(random.uniform(0.5, 2.0))
                 continue
             else:
@@ -108,6 +109,7 @@ def recupera_meteo(data, nome_citta):
             
         resp = risposta_meteo.json()
         
+        # Estrazione e calcolo della media umidità
         val_temp = float(resp['daily']['temperature_2m_max'][0])
         umidita_orarie = resp['hourly']['relative_humidity_2m']
         val_umidita = int(sum(umidita_orarie) / len(umidita_orarie))
@@ -131,15 +133,18 @@ with tab_mattina:
     col1, col2 = st.columns(2)
     
     with col1:
+        # Formato europeo della data (GG/MM/AAAA) abilitato nell'interfaccia
         data_sel = st.date_input("🗓️ Data:", value=datetime.date.today(), format="DD/MM/YYYY")
         posizione_input = st.text_input("📍 Posizione:", value=st.session_state.posizione)
     
+    # Esecuzione del motore Open-Meteo intelligente
     temp_api, umidita_api, errore_rilevato = recupera_meteo(data_sel, posizione_input)
     
     with col2:
         temp = st.number_input("🌡️ Temperatura massima prevista per oggi (°C):", value=temp_api)
         umidita = st.number_input("💧 Umidità media prevista (%):", value=int(umidita_api))
     
+    # Se il server fallisce tutti e 3 i tentativi, mostra un avviso ma ti fa andare avanti
     if errore_rilevato:
         st.warning("⚠️ Centralina meteo momentaneamente sovraccarica. Aggiorna la pagina o modifica i dati a mano per salvare!")
         st.caption(f"Dettaglio tecnico per controllo: {errore_rilevato}")
@@ -147,7 +152,7 @@ with tab_mattina:
     st.markdown("---") 
     
     sonno = st.selectbox("💤 Qualità del sonno:", ["discreta", "soddisfacente", "scarsa"])
-    passi = st.selectbox("🚶 Passi previsti:", ["fino a 1000", "da 1001 a 3000", "oltre i 3000"])
+    passi = st.selectbox("🚶 Passi previsti:", ["fino a 1000", "da 1001 a 3000", "oltre 3000"])
     energia = st.slider("⚡ Energia al risveglio (1-10):", 1, 10, 5)
     
     attivita = st.multiselect("📅 Attività in programma:", 
@@ -240,10 +245,5 @@ with tab_sera:
                     st.session_state.mattina_salvata = False 
                 else:
                     st.error(f"❌ Errore di salvataggio (Codice HTTP {r.status_code}). Verifica la configurazione dei campi.")
-                    # --- NUOVA SEZIONE DIAGNOSTICA INSERITA QUI ---
-                    with st.expander("🔍 STRUMENTO DIAGNOSTICO: Controlla cosa non piace a Google"):
-                        st.markdown("Confronta i valori qui sotto con le opzioni del tuo modulo Google online. "
-                                    "Se ad esempio sul modulo Google c'è scritto 'Match' ma qui vedi una parola diversa, il problema è lì!")
-                        st.json(payload)
             except Exception as e:
                 st.error(f"⚠️ Impossibile raggiungere Google Moduli: {e}")
