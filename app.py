@@ -4,25 +4,12 @@ import requests
 import time
 import random
 import pandas as pd
-import plotly.express as px
 
 # --- CONFIGURAZIONE ---
 st.set_page_config(page_title="La Mia Carica - MS Diary", layout="centered", page_icon="🔋")
 
 # URL DI INVIO DATI (Punta al formResponse del modulo)
 URL_MODULO = "https://docs.google.com/forms/d/e/1FAIpQLSfsNrtCcCMKrQ22pM-7NfrW7F9xWvtUSZPNBu83AgV9ZyWtDQ/formResponse"
-
-# URL CONFIGURATO CON IL TUO FOGLIO GOOGLE REALE
-URL_FOGLIO_DATI = "https://docs.google.com/spreadsheets/d/1eSnvfouOdaL-sakQgwKCItUEKXN-96ECF93KD96cx-E/export?format=csv"
-
-# MAPPATURA DEI NOMI DELLE COLONNE SUL TUO FOGLIO GOOGLE
-# Se l'app ti segnala un errore, verifica che questi testi corrispondano esattamente alle intestazioni delle colonne del foglio!
-COLONNE_FOGLIO = {
-    'data': '🗓️ Data:',                          # Es. 'Informazioni cronologiche' oppure il nome della tua domanda sulla data
-    'energia': '⚡ Energia al risveglio (1-10):', 
-    'dolore': 'Livello dolore avvertito (1-10):', 
-    'semaforo': 'Semaforo'                        
-}
 
 # MAPPATURA INPUT GOOGLE MODULI
 ENTRY_ID = {
@@ -104,8 +91,8 @@ def recupera_meteo(data, nome_citta):
 st.title("🔋 La Mia Carica")
 st.markdown("---")
 
-# Creazione dei 3 TAB
-tab_mattina, tab_sera, tab_stats = st.tabs(["🌅 Pianifica la Mattina", "🌌 Feedback Serale", "📊 Statistiche & Trend"])
+# Creazione dei soli 2 TAB operativi
+tab_mattina, tab_sera = st.tabs(["🌅 Pianifica la Mattina", "🌌 Feedback Serale"])
 
 # ==========================================
 # TAB MATTINA
@@ -172,73 +159,14 @@ with tab_sera:
                 ENTRY_ID['siesta_form']: "si" if st.session_state.siesta else "no", ENTRY_ID['valutazione']: valutazione,
                 ENTRY_ID['dolore']: str(int(dolore)), ENTRY_ID['note']: note_finali
             }
-            if st.session_state.attivita: payload[ENTRY_ID['attivita']] = st
-
-# ==========================================
-# TAB STATISTICHE (Versione Ottimizzata: Mattina vs Sera)
-# ==========================================
-with tab_stats:
-    st.subheader("📊 Consapevolezza del Diario: Previsione vs Vissuto")
-    
-    try:
-        df = pd.read_csv(URL_FOGLIO_DATI)
-        
-        if df.empty:
-            st.warning("Il database è ancora vuoto. Registra qualche giornata per sbloccare l'analisi!")
-        else:
-            st.success(f"📈 Sincronizzato! Analisi basata su {len(df)} giornate registrate.")
+            if st.session_state.attivita: payload[ENTRY_ID['attivita']] = st.session_state.attivita[0]
+            else: payload[ENTRY_ID['attivita']] = "riposo totale"
             
-            # Mappatura delle colonne reali del tuo foglio
-            col_data = "Data"
-            col_energia = "Energia al risveglio"
-            col_riscontro = "riscontro"
-            
-            # --- 1. ANALISI DELL'AFFIDABILITÀ DEI BOLLINI (RISCONTRO) ---
-            st.markdown("### 🎯 Quante volte la previsione del mattino era corretta?")
-            st.markdown("*Questo grafico mostra quanto la stima del mattino ha rispecchiato la tua giornata reale secondo i tuoi feedback serali.*")
-            
-            if col_riscontro in df.columns:
-                # Pulizia del dato (rimuove spazi bianchi)
-                df[col_riscontro] = df[col_riscontro].astype(str).str.strip()
-                
-                conteggio_riscontri = df[col_riscontro].value_counts().reset_index()
-                conteggio_riscontri.columns = ['Giudizio Serale', 'Giorni']
-                
-                # Creazione del grafico a torta basato sul vissuto della sera
-                fig_riscontro = px.pie(
-                    conteggio_riscontri, 
-                    names='Giudizio Serale', 
-                    values='Giorni',
-                    color='Giudizio Serale',
-                    color_discrete_map={
-                        'Match': '#00c853',           # Verde: Previsione azzeccata
-                        'Overestimated': '#ff4b4b',   # Rosso: La giornata è stata più faticosa del previsto
-                        'Underestimated': '#ffa500'   # Arancione: La giornata è andata meglio del previsto
-                    },
-                    hole=0.4
-                )
-                st.plotly_chart(fig_riscontro, use_container_width=True)
-            else:
-                st.error(f"Non trovo la colonna '{col_riscontro}' nel foglio.")
-
-            st.markdown("---")
-
-            # --- 2. ANDAMENTO DELL'ENERGIA MATTUTINA ---
-            st.markdown("### 📈 Andamento dell'Energia al Risveglio")
-            st.markdown("*Monitora come fluttua la tua carica iniziale giorno dopo giorno.*")
-            
-            if col_data in df.columns and col_energia in df.columns:
-                df_energia = df[[col_data, col_energia]].copy()
-                df_energia[col_energia] = pd.to_numeric(df_energia[col_energia], errors='coerce')
-                
-                # Rinominiamo la colonna per l'interfaccia grafico
-                df_energia.columns = ['Data', 'Energia al Mattino']
-                
-                # Grafico lineare dell'energia
-                st.line_chart(df_energia.set_index('Data'))
-                st.caption("Tracciando solo l'energia, puoi osservare se ci sono cicli o pattern ripetitivi nei tuoi risvegli.")
-            else:
-                st.error("Verifica la presenza delle colonne Data ed Energia nel tuo foglio.")
-                
-    except Exception as e:
-        st.error(f"⚠️ Errore nel caricamento dei grafici: {e}")
+            try:
+                r = requests.post(URL_MODULO, data=payload)
+                if r.status_code == 200:
+                    st.balloons()
+                    st.write("✅ Dati registrati nel database con successo! Buona notte 🌟")
+                    st.session_state.mattina_salvata = False 
+                else: st.error(f"❌ Errore (Codice HTTP {r.status_code}).")
+            except Exception as e: st.error(f"⚠️ Impossibile raggiungere Google Moduli: {e}")
