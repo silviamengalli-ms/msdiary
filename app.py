@@ -112,10 +112,23 @@ with tab_mattina:
     passi = st.selectbox("🚶 Passi previsti:", ["fino a 1000", "da 1001 a 3000", "oltre 3000"])
     energia = st.slider("⚡ Energia al risveglio (1-10):", 1, 10, 5)
     siesta = st.checkbox("🛌 Pianifico una siesta strategica/efficace oggi", value=st.session_state.siesta)
-    attivita = st.multiselect("📅 Attività in programma:", ["ufficio", "lavoro da casa", "piccole commissioni", "visita", "fisioterapia", "riposo totale", "sociale"])
+    
+    # AGGIUNTA VOCE 'studio' NELL'INTERFACCIA UTENTE
+    attivita = st.multiselect("📅 Attività in programma:", ["ufficio", "lavoro da casa", "studio", "piccole commissioni", "visita", "fisioterapia", "riposo totale", "sociale"])
 
     if st.button("🚀 Calcola e Salva Mattina", use_container_width=True):
-        pesi = {"ufficio": -0.5, "lavoro da casa": -0.2, "piccole commissioni": -0.4, "visita": -0.5, "fisioterapia": -0.5, "riposo totale": 0.5, "sociale": -0.7}
+        # AGGIUNTO IL PESO -0.3 PER L'ATTIVITÀ 'studio'
+        pesi = {
+            "ufficio": -0.5, 
+            "lavoro da casa": -0.2, 
+            "studio": -0.3, 
+            "piccole commissioni": -0.4, 
+            "visita": -0.5, 
+            "fisioterapia": -0.5, 
+            "riposo totale": 0.5, 
+            "sociale": -0.7
+        }
+        
         somma_att = sum([pesi[a] for a in attivita])
         if len(attivita) > 1: somma_att += (len(attivita) - 1) * -0.3
         p_temp = 0.0 if temp < 28.0 else -0.5 - ((temp - 28.0) * 0.3)
