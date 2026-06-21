@@ -196,10 +196,10 @@ with tab_mattina:
         somma_att = sum([pesi[a] for a in attivita])
         
         if len(attivita) > 1:
-            label_attivita = "Sommatoria Pesi Attività"
+            label_attivita = "Impatto Sommatoria Attività"
             mult_attivita_extra = (len(attivita) - 1) * -0.3
         else:
-            label_attivita = "Peso Attività Singola" if len(attivita) == 1 else "Nessuna Attività Selezionata"
+            label_attivita = "Impatto Attività Singola" if len(attivita) == 1 else "Nessuna Attività Selezionata"
             mult_attivita_extra = 0.0
             
         # --- LOGICA COMBINATA: CALORE + UMIDITÀ ---
@@ -220,17 +220,17 @@ with tab_mattina:
         
         ispezione_giornata = {
             "Punto di Partenza Fisso": 5.0,
-            "Contributo Energia Rilevato": round(energia * 0.3, 2),
-            "Impatto Qualità Sonno": peso_sonno,
-            "Impatto Target Passi": peso_passi,
+            "Valore Energetico al Risveglio": round(energia * 0.3, 2),
+            "Impatto Qualità del Sonno": peso_sonno,
+            "Impatto Passi Previsti": peso_passi,
             label_attivita: round(somma_att, 2),
-            "Zavorra Sovrapposizione Impegni": round(mult_attivita_extra, 2),
-            "Temperatura di Calcolo (con Afa)": f"{round(temp_percepita, 1)} °C",
-            "Penalizzazione Clima Totale": round(p_temp, 2),
+            "Accumulo da Sovrapposizione Impegni": round(mult_attivita_extra, 2),
+            "Meteo: Temperatura con Afa": f"{round(temp_percepita, 1)} °C",
+            "Impatto Clima Esterno": round(p_temp, 2),
             "Bonus Strategico Siesta": bonus_siesta,
-            "VALORE BASE DI OGGI": round(score_base, 2),
+            "VALORE DI BASE ODIERNO": round(score_base, 2),
             "SOTTRAZIONE ACCUMULO 72H": -accumulo,
-            "RISULTATO FINALE MATEMATICO": valore_calcolato,
+            "VALORE PONDERATO FINALE": valore_calcolato,
             "Storico Database Usato": debug_data
         }
         
@@ -317,12 +317,12 @@ with st.sidebar:
         st.subheader("Matematica Odierna")
         for voce, valore in st.session_state.ispezione_log.items():
             if voce != "Storico Database Usato":
-                if "FINALE" in voce:
+                if "VALORE PONDERATO FINALE" in voce:
                     st.metric(label=f"🏆 {voce}", value=valore)
-                elif "ACCUMULO" in voce:
+                elif "SOTTRAZIONE ACCUMULO" in voce:
                     st.error(f"📉 Peso dell'Accumulo (Ultime 72h): {valore}")
-                elif "BASE" in voce:
-                    st.info(f"📊 Energia Potenziale di Oggi: {valore}")
+                elif "VALORE DI BASE" in voce:
+                    st.info(f"📊 Valore di Base Odierno: {valore}")
                 else:
                     st.text(f"• {voce}: {valore}")
         
@@ -330,14 +330,4 @@ with st.sidebar:
         st.subheader("Lettura Storico 72h")
         db_debug = st.session_state.ispezione_log["Storico Database Usato"]
         st.caption(f"Stato: {db_debug['status']}")
-        st.caption(f"Righe totali database: {db_debug['righe_rilevate'] if 'righe_rilevate' in db_debug else 0}")
-        
-        if "dettaglio_giorni" in db_debug and db_debug["dettaglio_giorni"]:
-            for giorno in db_debug["dettaglio_giorni"]:
-                with st.expander(f"📅 Analisi {giorno['giorno'].upper()}"):
-                    st.write(f"**Crash registrato:** `{giorno['crash_rilevato']}`")
-                    st.write(f"**Riscontro serale:** `{giorno['riscontro_serale']}`")
-                    st.write(f"**Peso temporale:** {giorno['peso_temporale'] * 100}%")
-                    if "moltiplicatore_protezione" in giorno:
-                        st.warning("⚠️ Scudo attivo (Sotto-stimato x1.5)")
-                    st.write(f"**Penalità calcolata:** -{giorno['penalita_applicata']}")
+        st.caption(f"Righe totali database: {db_debug['righe_rilevate'] if 'righe_rilevate' in db
