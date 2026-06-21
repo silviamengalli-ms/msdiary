@@ -210,10 +210,10 @@ with tab_mattina:
             
         p_temp = 0.0 if temp_percepita < 28.0 else -0.5 - ((temp_percepita - 28.0) * 0.3)
         
-        # --- LOGICA SONNO RICALIBRATA ---
+        # --- LOGICA SONNO FISIOLOGICA ---
         peso_sonno = {"discreta": 0.0, "soddisfacente": 1.5, "scarsa": -1.5}[sonno]
         
-        # --- LOGICA PASSI E SIESTA BILANCIATA ---
+        # --- LOGICA PASSI E SIESTA PROPORZIONATA ---
         peso_passi = {"fino a 1000": 0.2, "da 1001 a 3000": -0.2, "oltre 3000": -0.5}[passi]
         bonus_siesta = 0.4 if siesta else 0.0
         
@@ -256,7 +256,7 @@ with tab_mattina:
         st.write("👈 Apri la barra laterale a sinistra per verificare i calcoli corretti.")
 
 # ==========================================
-# TAB SERA
+# TAB SERA (CON STRUMENTO DI DEBUG ERRORE 400)
 # ==========================================
 with tab_sera:
     if not st.session_state.mattina_salvata:
@@ -298,14 +298,22 @@ with tab_sera:
             if st.session_state.attivita: payload[ENTRY_ID['attivita']] = st.session_state.attivita[0]
             else: payload[ENTRY_ID['attivita']] = "riposo totale"
             
+            # --- BLOCCO ISPEZIONE PAYLOAD ED ERRORE ---
+            st.markdown("---")
+            st.subheader("🔍 Monitoraggio Invio Dati")
+            with st.expander("Visualizza il pacchetto JSON spedito a Google"):
+                st.json(payload)
+            
             try:
                 r = requests.post(URL_MODULO, data=payload)
                 if r.status_code == 200:
                     st.balloons()
-                    st.write("✅ Dati registrati con successo! Buona notte 🌟")
+                    st.success("✅ Dati registrati con successo! Buona notte 🌟")
                     st.session_state.mattina_salvata = False 
                 else: 
                     st.error(f"❌ Errore di trasmissione (Codice HTTP {r.status_code}).")
+                    with st.expander("Analisi dettagliata della risposta del server Google"):
+                        st.code(r.text[:800]) # Mostra cosa risponde Google per individuare il campo rifiutato
             except Exception as e: 
                 st.error(f"⚠️ Errore connessione modulo: {e}")
 
