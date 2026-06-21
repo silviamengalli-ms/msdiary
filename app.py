@@ -4,14 +4,15 @@ import requests
 import time
 import random
 import pandas as pd
+from streamlit_gsheets import GSheetsConnection
 
-# --- CONFIGURAZIONE ---
+# --- CONFIGURAZIONE PRINCIPALE ---
 st.set_page_config(page_title="La Mia Carica - MS Diary", layout="centered", page_icon="🔋")
 
-# URL DI INVIO DATI (Punta al formResponse del modulo)
+# URL DI INVIO DATI PRINCIPALE (formResponse)
 URL_MODULO = "https://docs.google.com/forms/d/e/1FAIpQLSfsNrtCcCMKrQ22pM-7NfrW7F9xWvtUSZPNBu83AgV9ZyWtDQ/formResponse"
 
-# MAPPATURA INPUT GOOGLE MODULI
+# MAPPATURA INPUT GOOGLE MODULI AGGIORNATA (MAIN)
 ENTRY_ID = {
     'data': 'entry.2022449610',
     'posizione': 'entry.1412086707',
@@ -25,10 +26,11 @@ ENTRY_ID = {
     'siesta_form': 'entry.1353678088', 
     'dolore': 'entry.672372933',
     'valutazione': 'entry.2023032977',
-    'note': 'entry.158362423'
+    'note': 'entry.158362423',
+    'crash': 'entry.592499523'
 }
 
-# --- STATO INIZIALE (Inizializzazione Sicura della memoria) ---
+# --- STATO INIZIALE ---
 stato_iniziale = {
     'mattina_salvata': False,
     'mattina_data': None, 
@@ -61,6 +63,70 @@ def invia_richiesta_con_riconnessione(url, parametri):
             time.sleep(random.uniform(0.5, 2.0))
     return None
 
+# --- FUNZIONE INTERNA: CALCOLO DIRETTO DELLE 72 ORE DAL FOGLIO ---
+def calcola_zavorra_72ore():
+    try:
+        # Connessione sicura nativa tramite i Secrets inseriti nella dashboard di Streamlit
+        conn = st.connection("gsheets", type=GSheetsConnection)
+        # Legge il database in tempo reale (mantiene in cache per 5 minuti per efficienza)
+        df = conn.read(ttl="5m") 
+        
+        if df is None or len(df) < 3:
+            return 0.0, "Storico insufficiente nel database (< 3 righe)"
+        
+        # Identificazione automatica delle colonne per evitare problemi di maiuscole/minuscole
+        colonna_crash = [c for c in df.columns if 'crash' in c.lower()]
+        colonna_match = [c for c in df.columns if 'valutazione' in c.lower() or 'riscontro' in c.lower()]
+        
+        if not colonna_crash:
+            return 0.0, "Nessuna zavorra attiva (In attesa dei primi dati con colonna Crash)"
+            
+        col_c = colonna_crash[0]
+        col_m = colonna_match[0] if colonna_match else None
+        
+        # Isoliamo gli ultimi 3 giorni reali registrati nel file
+        ultimi_3_giorni = df.tail(3).to_dict('records')
+        ieri = ultimi_3_giorni[-1]
+        due_giorni_fa = ultimi_3_giorni[-2]
+        tre_giorni_fa = ultimi_3_giorni[-3]
+        
+        pesi_temporali = {'ieri': 1.0, 'due_giorni': 0.5, 'tre_giorni': 0.25}
+        zavorra_totale = 0.0
+        dettaglio_log = []
+        
+        # Analisi Ieri (Impatto 100%)
+        val_crash_ieri = str(ieri.get(col_c, '0')).strip()
+        if val_crash_ieri.startswith('1'):
+            impatto = 1.5 * pesi_temporali['ieri']
+            if col_m and str(ieri.get(col_m, '')).strip() == "Underestimated":
+                impatto *= 1.5  # Moltiplicatore correttivo di protezione
+            zavorra_totale += impatto
+            dettaglio_log.append(f"Ieri (-{impatto})")
+
+        # Analisi 2 Giorni Fa (Impatto 50%)
+        val_crash_due = str(due_giorni_fa.get(col_c, '0')).strip()
+        if val_crash_due.startswith('1'):
+            impatto = 1.5 * pesi_temporali['due_giorni']
+            if col_m and str(due_giorni_fa.get(col_m, '')).strip() == "Underestimated":
+                impatto *= 1.5
+            zavorra_totale += impatto
+            dettaglio_log.append(f"2gg fa (-{impatto})")
+
+        # Analisi 3 Giorni Fa (Impatto 25%)
+        val_crash_tre = str(tre_giorni_fa.get(col_c, '0')).strip()
+        if val_crash_tre.startswith('1'):
+            impatto = 1.5 * pesi_temporali['tre_giorni']
+            if col_m and str(tre_giorni_fa.get(col_m, '')).strip() == "Underestimated":
+                impatto *= 1.5
+            zavorra_totale += impatto
+            dettaglio_log.append(f"3gg fa (-{impatto})")
+            
+        stringa_report = " + ".join(dettaglio_log) if dettaglio_log else "Nessun sovraccarico rilevato, corpo libero."
+        return round(zavorra_totale, 2), stringa_report
+
+    except Exception as e:
+        return 0.0, f"In attesa del primo allineamento storico: {str(e)}"
+
 # --- FUNZIONE METEO ---
 @st.cache_data(ttl=60)
 def recupera_meteo(data, nome_citta):
@@ -91,7 +157,6 @@ def recupera_meteo(data, nome_citta):
 st.title("🔋 La Mia Carica")
 st.markdown("---")
 
-# Creazione dei soli 2 TAB operativi
 tab_mattina, tab_sera = st.tabs(["🌅 Pianifica la Mattina", "🌌 Feedback Serale"])
 
 # ==========================================
@@ -113,20 +178,16 @@ with tab_mattina:
     energia = st.slider("⚡ Energia al risveglio (1-10):", 1, 10, 5)
     siesta = st.checkbox("🛌 Pianifico una siesta strategica/efficace oggi", value=st.session_state.siesta)
     
-    # AGGIUNTA VOCE 'studio' NELL'INTERFACCIA UTENTE
     attivita = st.multiselect("📅 Attività in programma:", ["ufficio", "lavoro da casa", "studio", "piccole commissioni", "visita", "fisioterapia", "riposo totale", "sociale"])
 
     if st.button("🚀 Calcola e Salva Mattina", use_container_width=True):
-        # AGGIUNTO IL PESO -0.3 PER L'ATTIVITÀ 'studio'
+        # 1. RECUPERO DELLA ZAVORRA PREVENTIVA DAL PASSATO
+        zavorra, log_zavorra = calcola_zavorra_72ore()
+        
         pesi = {
-            "ufficio": -0.5, 
-            "lavoro da casa": -0.2, 
-            "studio": -0.3, 
-            "piccole commissioni": -0.4, 
-            "visita": -0.5, 
-            "fisioterapia": -0.5, 
-            "riposo totale": 0.5, 
-            "sociale": -0.7
+            "ufficio": -0.5, "lavoro da casa": -0.2, "studio": -0.3, # Peso studio applicato stabilmente
+            "piccole commissioni": -0.4, "visita": -0.5, "fisioterapia": -0.5, 
+            "riposo totale": 0.5, "sociale": -0.7
         }
         
         somma_att = sum([pesi[a] for a in attivita])
@@ -135,12 +196,23 @@ with tab_mattina:
         peso_sonno = {"discreta": 0.0, "soddisfacente": 1.0, "scarsa": -1.5}[sonno]
         peso_passi = {"fino a 1000": 0.5, "da 1001 a 3000": 0.0, "oltre 3000": -0.3}[passi]
         
+        # Algoritmo base odierno
         score = 5.0 + (energia * 0.3) + peso_sonno + peso_passi + somma_att + p_temp
         if siesta: score += 0.3
-        valore_calcolato = round(max(1.0, min(10.0, score)), 1)
+        
+        # 2. APPLICAZIONE DELLO SCUDO DELLE 72 ORE
+        score_finale = score - zavorra
+        valore_calcolato = round(max(1.0, min(10.0, score_finale)), 1)
         
         st.session_state.update({'mattina_salvata': True, 'mattina_data': data_sel, 'posizione': posizione_input, 'temp': temp, 'umidita': umidita, 'sonno': sonno, 'passi': passi, 'energia': energia, 'attivita': attivita, 'siesta': siesta, 'valore_sem': valore_calcolato})
+        
         st.markdown("---") 
+        # Notifica visiva dello scudo zavorra
+        if zavorra > 0:
+            st.warning(f"🛡️ **Scudo 72 Ore Attivo**: Il punteggio iniziale è stato ridotto preventivamente di **-{zavorra} punti** per sovraccarichi passati. ({log_zavorra})")
+        else:
+            st.caption(f"📊 Controllo Storico: {log_zavorra}")
+            
         if valore_calcolato <= 4.5: st.error(f"🔴 BOLLINO ROSSO: {valore_calcolato} Dai priorità al riposo 🐢")
         elif valore_calcolato <= 7.0: st.warning(f"🟡 BOLLINO GIALLO: {valore_calcolato} Giornata regolare, procedi con calma 🐘")
         else: st.success(f"🟢 BOLLINO VERDE: {valore_calcolato} Ottima carica! 🦋")
@@ -155,6 +227,15 @@ with tab_sera:
     else:
         st.subheader("Com'è andata la giornata?")
         st.markdown(f"Punteggio stimato stamattina: **{st.session_state.valore_sem}**")
+        
+        # Selettore Serale del Crash
+        crash_scelta = st.radio(
+            "💥 C'è stato un crash/sovraccarico oggi?", 
+            ["0 - No", "1 - Sì"], 
+            index=0, 
+            horizontal=True
+        )
+        
         valutazione = st.selectbox("Il punteggio del mattino era corretto? (Riscontro):", ["Match", "Overestimated", "Underestimated"])
         dolore = st.slider("Livello dolore avvertito (1-10):", 1, 10, 1)
         note = st.text_area("Note o riflessioni serali:", placeholder="Scrivi qui le tue annotazioni...")
@@ -164,14 +245,23 @@ with tab_sera:
             note_finali = f"[Attività svolte: {stringa_attivita_completa}] {note}".strip()
             semaforo_protetto = max(1, min(10, int(round(st.session_state.valore_sem))))
             
+            # Payload completo per l'invio dati via Google Moduli
             payload = {
-                ENTRY_ID['data']: st.session_state.mattina_data.strftime("%d/%m/%Y"), ENTRY_ID['posizione']: st.session_state.posizione,
-                ENTRY_ID['temp']: str(int(round(st.session_state.temp))), ENTRY_ID['umidita']: str(int(st.session_state.umidita)),
-                ENTRY_ID['sonno']: st.session_state.sonno, ENTRY_ID['energia']: str(int(st.session_state.energia)),
-                ENTRY_ID['passi']: st.session_state.passi, ENTRY_ID['semaforo']: str(semaforo_protetto),
-                ENTRY_ID['siesta_form']: "si" if st.session_state.siesta else "no", ENTRY_ID['valutazione']: valutazione,
-                ENTRY_ID['dolore']: str(int(dolore)), ENTRY_ID['note']: note_finali
+                ENTRY_ID['data']: st.session_state.mattina_data.strftime("%d/%m/%Y"), 
+                ENTRY_ID['posizione']: st.session_state.posizione,
+                ENTRY_ID['temp']: str(int(round(st.session_state.temp))), 
+                ENTRY_ID['umidita']: str(int(st.session_state.umidita)),
+                ENTRY_ID['sonno']: st.session_state.sonno, 
+                ENTRY_ID['energia']: str(int(st.session_state.energia)),
+                ENTRY_ID['passi']: st.session_state.passi, 
+                ENTRY_ID['semaforo']: str(semaforo_protetto),
+                ENTRY_ID['siesta_form']: "si" if st.session_state.siesta else "no", 
+                ENTRY_ID['valutazione']: valutazione,
+                ENTRY_ID['dolore']: str(int(dolore)), 
+                ENTRY_ID['note']: note_finali,
+                ENTRY_ID['crash']: crash_scelta 
             }
+            
             if st.session_state.attivita: payload[ENTRY_ID['attivita']] = st.session_state.attivita[0]
             else: payload[ENTRY_ID['attivita']] = "riposo totale"
             
@@ -181,5 +271,7 @@ with tab_sera:
                     st.balloons()
                     st.write("✅ Dati registrati nel database con successo! Buona notte 🌟")
                     st.session_state.mattina_salvata = False 
-                else: st.error(f"❌ Errore (Codice HTTP {r.status_code}).")
-            except Exception as e: st.error(f"⚠️ Impossibile raggiungere Google Moduli: {e}")
+                else: 
+                    st.error(f"❌ Errore di trasmissione (Codice HTTP {r.status_code}). Verifica gli ID dei campi.")
+            except Exception as e: 
+                st.error(f"⚠️ Impossibile raggiungere Google Moduli: {e}")
