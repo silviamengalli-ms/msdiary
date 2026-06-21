@@ -73,6 +73,7 @@ def calcola_accumulo_72ore():
         "righe_rilevate": 0,
         "dettaglio_giorni": []
     }
+
     try:
         conn = st.connection("gsheets", type=GSheetsConnection)
         df = conn.read(ttl="1m") 
@@ -82,6 +83,7 @@ def calcola_accumulo_72ore():
             return 0.0, "Storico insufficiente nel database", ispezione
         
         ispezione["righe_rilevate"] = len(df)
+
         colonna_crash = [c for c in df.columns if 'crash' in c.lower()]
         colonna_match = [c for c in df.columns if 'valutazione' in c.lower() or 'riscontro' in c.lower()]
         
@@ -94,13 +96,18 @@ def calcola_accumulo_72ore():
         
         ultimi_3_giorni = df.tail(3).to_dict('records')
         giorni_etichette = ['ieri', 'due_giorni', 'tre_giorni']
-        pesi_temporali = {'ieri': 1.0, 'due_giorni': 0.5, 'tre_giorni': 0.25}
+        pesi_temporali = {
+            'ieri': 1.0,
+            'due_giorni': 0.5,
+            'tre_giorni': 0.25
+        }
         
         accumulo_totale = 0.0
         dettaglio_log = []
         
         for i, etichetta in enumerate(reversed(giorni_etichette)):
             record = ultimi_3_giorni[i]
+
             val_crash = str(record.get(col_c, '0')).strip().lower()
             val_match = str(record.get(col_m, '')).strip() if col_m else "N/D"
             
@@ -114,6 +121,7 @@ def calcola_accumulo_72ore():
             
             if val_crash.startswith('1') or 'si' in val_crash or 'sì' in val_crash:
                 impatto = 1.5 * pesi_temporali[etichetta]
+
                 if val_match == "Underestimated":
                     impatto *= 1.5
                     info_giorno["moltiplicatore_protezione"] = "Attivo (x1.5)"
@@ -126,6 +134,7 @@ def calcola_accumulo_72ore():
             
         stringa_report = " + ".join(dettaglio_log) if dettaglio_log else "Nessun sovraccarico rilevato."
         ispezione["status"] = "Calcolo completato con successo"
+
         return round(accumulo_totale, 2), stringa_report, ispezione
 
     except Exception as e:
@@ -137,8 +146,15 @@ def calcola_accumulo_72ore():
 def recupera_meteo(data, nome_citta):
     try:
         url_geo = "https://geocoding-api.open-meteo.com/v1/search"
-        params_geo = {"name": nome_citta.strip(), "count": 1, "language": "it", "format": "json"}
+        params_geo = {
+            "name": nome_citta.strip(),
+            "count": 1,
+            "language": "it",
+            "format": "json"
+        }
+
         risposta_geo = invia_richiesta_con_riconnessione(url_geo, params_geo)
+
         if not risposta_geo or risposta_geo.status_code != 200:
             return 20.0, 50, "Errore di rete"
 
@@ -152,6 +168,7 @@ def recupera_meteo(data, nome_citta):
             return 20.0, 50, "Città non trovata."
 
         d_str = data.strftime("%Y-%m-%d")
+
         url_meteo = "https://api.open-meteo.com/v1/forecast"
         params_meteo = {
             "latitude": lat,
@@ -164,10 +181,12 @@ def recupera_meteo(data, nome_citta):
         }
 
         risposta_meteo = invia_richiesta_con_riconnessione(url_meteo, params_meteo)
+
         if not risposta_meteo or risposta_meteo.status_code != 200:
             return 20.0, 50, "Errore di rete"
 
         resp = risposta_meteo.json()
+
         val_temp = float(resp['daily']['temperature_2m_max'][0])
         umidita_orarie = resp['hourly']['relative_humidity_2m']
         val_umidita = int(sum(umidita_orarie) / len(umidita_orarie))
@@ -329,13 +348,8 @@ with tab_mattina:
         
         st.markdown("---") 
 
-        if accumulo > 0:
-            st.warning(
-                f"🛡️ **Scudo Carico Attivo**: Il punteggio iniziale risente di un "
-                f"**Accumulo di stanchezza pari a -{accumulo} punti** dovuto ai giorni passati. "
-                f"({log_accumulo})"
-            )
-        else:
+        # Il calcolo dell'accumulo resta attivo, ma il banner "Scudo Carico Attivo" non viene più mostrato.
+        if accumulo <= 0:
             st.caption(f"📊 Controllo Storico: {log_accumulo}")
             
         if valore_calcolato <= 4.5:
@@ -344,8 +358,6 @@ with tab_mattina:
             st.warning(f"🟡 BOLLINO GIALLO: {valore_calcolato} Giornata regolare, procedi con calma 🐘")
         else:
             st.success(f"🟢 BOLLINO VERDE: {valore_calcolato} Ottima carica! 🦋")
-
-        st.write("👈 Apri la barra laterale a sinistra per verificare i calcoli corretti.")
 
 # ==========================================
 # TAB SERA 
@@ -400,12 +412,14 @@ with tab_sera:
             
             try:
                 r = requests.post(URL_MODULO, data=payload)
+
                 if r.status_code == 200:
                     st.balloons()
                     st.success("Dati registrati con successo! Buona notte")
                     st.session_state.mattina_salvata = False 
                 else: 
                     st.error(f"❌ Errore di trasmissione (Codice HTTP {r.status_code}).")
+
             except Exception as e: 
                 st.error(f"⚠️ Errore connessione modulo: {e}")
 
