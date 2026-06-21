@@ -3,3 +3,4 @@ pandas
 scikit-learn
 requests
 plotly
+st-gsheets-connection
