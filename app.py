@@ -27,7 +27,8 @@ ENTRY_ID = {
     'dolore': 'entry.672372933',
     'valutazione': 'entry.2023032977',
     'note': 'entry.158362423',
-    'crash': 'entry.592499523'
+    'crash': 'entry.592499523',
+    'calore_form': 'entry.123456789'  # ID del campo esposizione al calore
 }
 
 # --- STATO INIZIALE ---
@@ -43,6 +44,7 @@ stato_iniziale = {
     'attivita': [], 
     'siesta': False,  
     'valore_sem': None,
+    'esposizione_reale_calore': "no",
     'ispezione_log': {}
 }
 
@@ -98,7 +100,7 @@ def calcola_accumulo_72ore():
         dettaglio_log = []
         
         for i, etichetta in enumerate(reversed(giorni_etichette)):
-            record = ultimi_3_giorni[i]
+            record = ultime_3_giorni[i]
             val_crash = str(record.get(col_c, '0')).strip().lower()
             val_match = str(record.get(col_m, '')).strip() if col_m else "N/D"
             
@@ -143,7 +145,7 @@ def recupera_meteo(data, nome_citta):
         if "results" in data_geo and len(data_geo["results"]) > 0:
             lat = data_geo["results"][0]["latitude"]
             lon = data_geo["results"][0]["longitude"]
-        else: return 20.0, 50, f"Città non trouvata."
+        else: return 20.0, 50, f"Città non trovata."
         d_str = data.strftime("%Y-%m-%d")
         url_meteo = "https://api.open-meteo.com/v1/forecast"
         params_meteo = {"latitude": lat, "longitude": lon, "start_date": d_str, "end_date": d_str, "daily": "temperature_2m_max", "hourly": "relative_humidity_2m", "timezone": "Europe/Rome"}
@@ -202,13 +204,24 @@ with tab_mattina:
             label_attivita = "Impatto Attività Singola" if len(attivita) == 1 else "Nessuna Attività Selezionata"
             mult_attivita_extra = 0.0
             
-        # --- LOGICA COMBINATA: CALORE + UMIDITÀ ---
+        # --- LOGICA INTELLIGENTE ESPOSIZIONE CALORE ---
+        attività_esposte = {"ufficio", "piccole commissioni", "visita", "fisioterapia", "sociale"}
+        ha_attività_esposte = any(a in attività_esposte for a in attivita)
+        
         temp_percepita = temp
         if temp >= 27.0 and umidita > 60:
             gradi_extra_umidita = ((umidita - 60) / 10.0) * 0.5
             temp_percepita = temp + gradi_extra_umidita
             
-        p_temp = 0.0 if temp_percepita < 28.0 else -0.5 - ((temp_percepita - 28.0) * 0.3)
+        # Se non ci sono attività esposte (es. resti a casa a studiare/lavorare), p_temp si azzera
+        if not ha_attività_esposte and len(attivita) > 0:
+            p_temp = 0.0
+            stato_calore = "no"
+            nota_clima = "Annullato (giornata in ambiente protetto)"
+        else:
+            p_temp = 0.0 if temp_percepita < 28.0 else -0.5 - ((temp_percepita - 28.0) * 0.3)
+            stato_calore = "si" if p_temp < 0.0 else "no"
+            nota_clima = f"{round(p_temp, 2)} (esposizione attiva all'esterno)"
         
         # --- LOGICA SONNO FISIOLOGICA ---
         peso_sonno = {"discreta": 0.0, "soddisfacente": 1.5, "scarsa": -1.5}[sonno]
@@ -228,7 +241,7 @@ with tab_mattina:
             label_attivita: round(somma_att, 2),
             "Accumulo da Sovrapposizione Impegni": round(mult_attivita_extra, 2),
             "Meteo: Temperatura con Afa": f"{round(temp_percepita, 1)} °C",
-            "Impatto Clima Esterno": round(p_temp, 2),
+            "Impatto Clima Esterno": nota_clima,
             "Bonus Strategico Siesta": bonus_siesta,
             "VALORE DI BASE ODIERNO": round(score_base, 2),
             "IMPATTO DELL'ACCUMULO (ULTIME 72H)": -accumulo,
@@ -240,7 +253,8 @@ with tab_mattina:
             'mattina_salvata': True, 'mattina_data': data_sel, 'posizione': posizione_input, 
             'temp': temp, 'umidita': umidita, 'sonno': sonno, 'passi': passi, 
             'energia': energia, 'attivita': attivita, 'siesta': siesta, 
-            'valore_sem': valore_calcolato, 'ispezione_log': ispezione_giornata
+            'valore_sem': valore_calcolato, 'esposizione_reale_calore': stato_calore,
+            'ispezione_log': ispezione_giornata
         })
         
         st.markdown("---") 
@@ -255,7 +269,7 @@ with tab_mattina:
         st.write("👈 Apri la barra laterale a sinistra per verificare i calcoli corretti.")
 
 # ==========================================
-# TAB SERA 
+# TAB SERA
 # ==========================================
 with tab_sera:
     if not st.session_state.mattina_salvata:
@@ -291,7 +305,8 @@ with tab_sera:
                 ENTRY_ID['valutazione']: valutazione,
                 ENTRY_ID['dolore']: str(int(dolore)), 
                 ENTRY_ID['note']: note_finali,
-                ENTRY_ID['crash']: crash_scelta 
+                ENTRY_ID['crash']: crash_scelta,
+                ENTRY_ID['calore_form']: st.session_state.esposizione_reale_calore  # Autocalcolato in base alle attività
             }
             
             if st.session_state.attivita: payload[ENTRY_ID['attivita']] = st.session_state.attivita[0]
@@ -318,14 +333,12 @@ with st.sidebar:
     else:
         st.subheader("Analisi della giornata")
         
-        # Mostra prima le voci di calcolo intermedie, escludendo il punto fisso rimosso
         for voce, valore in st.session_state.ispezione_log.items():
             if voce not in ["Storico Database Usato", "VALORE DI BASE ODIERNO", "IMPATTO DELL'ACCUMULO (ULTIME 72H)", "VALORE PONDERATO FINALMENTE", "VALORE PONDERATO FINALE", "Punto di Partenza Fisso"]:
                 st.text(f"• {voce}: {valore}")
         
         st.markdown("---")
         
-        # Blocco valori di sintesi formattati in modo identico e pulito senza icone
         base_val = st.session_state.ispezione_log.get("VALORE DI BASE ODIERNO", 0.0)
         acc_val = st.session_state.ispezione_log.get("IMPATTO DELL'ACCUMULO (ULTIME 72H)", 0.0)
         fin_val = st.session_state.ispezione_log.get("VALORE PONDERATO FINALE", 0.0)
