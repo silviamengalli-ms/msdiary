@@ -125,4 +125,4 @@ def calcola_zavorra_72ore():
             
         stringa_report = " + ".join(dettaglio_log) if dettaglio_log else "Nessun sovraccarico rilevato."
         ispezione["status"] = "Calcolo completato con successo"
-        return round(zavorra_totale, 2
+        return round(zavorra_totale, 2)
