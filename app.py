@@ -210,9 +210,12 @@ with tab_mattina:
             
         p_temp = 0.0 if temp_percepita < 28.0 else -0.5 - ((temp_percepita - 28.0) * 0.3)
         
-        peso_sonno = {"discreta": 0.0, "soddisfacente": 1.0, "scarsa": -1.5}[sonno]
-        peso_passi = {"fino a 1000": 0.5, "da 1001 a 3000": 0.0, "oltre 3000": -0.3}[passi]
-        bonus_siesta = 0.3 if siesta else 0.0
+        # --- LOGICA SONNO RICALIBRATA ---
+        peso_sonno = {"discreta": 0.0, "soddisfacente": 1.5, "scarsa": -1.5}[sonno]
+        
+        # --- LOGICA PASSI E SIESTA BILANCIATA ---
+        peso_passi = {"fino a 1000": 0.2, "da 1001 a 3000": -0.2, "oltre 3000": -0.5}[passi]
+        bonus_siesta = 0.4 if siesta else 0.0
         
         score_base = 5.0 + (energia * 0.3) + peso_sonno + peso_passi + somma_att + mult_attivita_extra + p_temp + bonus_siesta
         score_finale = score_base - accumulo
