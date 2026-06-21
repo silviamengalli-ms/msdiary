@@ -143,7 +143,7 @@ def recupera_meteo(data, nome_citta):
         if "results" in data_geo and len(data_geo["results"]) > 0:
             lat = data_geo["results"][0]["latitude"]
             lon = data_geo["results"][0]["longitude"]
-        else: return 20.0, 50, f"Città non trovata."
+        else: return 20.0, 50, f"Città non trouvata."
         d_str = data.strftime("%Y-%m-%d")
         url_meteo = "https://api.open-meteo.com/v1/forecast"
         params_meteo = {"latitude": lat, "longitude": lon, "start_date": d_str, "end_date": d_str, "daily": "temperature_2m_max", "hourly": "relative_humidity_2m", "timezone": "Europe/Rome"}
@@ -222,7 +222,6 @@ with tab_mattina:
         valore_calcolato = round(max(1.0, min(10.0, score_finale)), 1)
         
         ispezione_giornata = {
-            "Punto di Partenza Fisso": 5.0,
             "Valore Energetico al Risveglio": round(energia * 0.3, 2),
             "Impatto Qualità del Sonno": peso_sonno,
             "Impatto Passi Previsti": peso_passi,
@@ -256,7 +255,7 @@ with tab_mattina:
         st.write("👈 Apri la barra laterale a sinistra per verificare i calcoli corretti.")
 
 # ==========================================
-# TAB SERA (CON STRINGHE CRASH ALLINEATE AL MODULO)
+# TAB SERA 
 # ==========================================
 with tab_sera:
     if not st.session_state.mattina_salvata:
@@ -265,7 +264,6 @@ with tab_sera:
         st.subheader("Com'è andata la giornata?")
         st.markdown(f"Punteggio stimato stamattina: **{st.session_state.valore_sem}**")
         
-        # Allineato al formato esatto richiesto dal tuo modulo Google
         crash_scelta = st.radio(
             "💥 C'è stato un crash/sovraccarico oggi?", 
             ["0 - no", "1 - si"], index=0, horizontal=True
@@ -299,43 +297,42 @@ with tab_sera:
             if st.session_state.attivita: payload[ENTRY_ID['attivita']] = st.session_state.attivita[0]
             else: payload[ENTRY_ID['attivita']] = "riposo totale"
             
-            st.markdown("---")
-            st.subheader("🔍 Monitoraggio Invio Dati")
-            with st.expander("Visualizza il pacchetto JSON spedito a Google"):
-                st.json(payload)
-            
             try:
                 r = requests.post(URL_MODULO, data=payload)
                 if r.status_code == 200:
                     st.balloons()
-                    st.success("✅ Dati registrati con successo! Buona notte 🌟")
+                    st.success("Dati registrati con successo! Buona notte")
                     st.session_state.mattina_salvata = False 
                 else: 
                     st.error(f"❌ Errore di trasmissione (Codice HTTP {r.status_code}).")
-                    with st.expander("Analisi dettagliata della risposta del server Google"):
-                        st.code(r.text[:800]) 
             except Exception as e: 
                 st.error(f"⚠️ Errore connessione modulo: {e}")
 
 # ==========================================
-# BARRA LATERALE - ISPEZIONE TRASPARENTE ALGORITMO
+# BARRA LATERALE - ISPEZIONE ALLINEATA ED ESSENZIALE
 # ==========================================
 with st.sidebar:
     st.header("🔬 Ispezione Algoritmo")
     if not st.session_state.ispezione_log:
         st.info("Esegui un calcolo nel Tab Mattina per attivare la telemetria.")
     else:
-        st.subheader("Matematica Odierna")
+        st.subheader("Analisi della giornata")
+        
+        # Mostra prima le voci di calcolo intermedie, escludendo il punto fisso rimosso
         for voce, valore in st.session_state.ispezione_log.items():
-            if voce != "Storico Database Usato":
-                if "VALORE PONDERATO FINALE" in voce:
-                    st.metric(label=f"🏆 {voce}", value=valore)
-                elif "IMPATTO DELL'ACCUMULO" in voce:
-                    st.error(f"📉 Impatto dell'Accumulo (Ultime 72h): {valore}")
-                elif "VALORE DI BASE" in voce:
-                    st.info(f"📊 Valore di Base Odierno: {valore}")
-                else:
-                    st.text(f"• {voce}: {valore}")
+            if voce not in ["Storico Database Usato", "VALORE DI BASE ODIERNO", "IMPATTO DELL'ACCUMULO (ULTIME 72H)", "VALORE PONDERATO FINALMENTE", "VALORE PONDERATO FINALE", "Punto di Partenza Fisso"]:
+                st.text(f"• {voce}: {valore}")
+        
+        st.markdown("---")
+        
+        # Blocco valori di sintesi formattati in modo identico e pulito senza icone
+        base_val = st.session_state.ispezione_log.get("VALORE DI BASE ODIERNO", 0.0)
+        acc_val = st.session_state.ispezione_log.get("IMPATTO DELL'ACCUMULO (ULTIME 72H)", 0.0)
+        fin_val = st.session_state.ispezione_log.get("VALORE PONDERATO FINALE", 0.0)
+        
+        st.text(f"VALORE DI BASE ODIERNO: {base_val}")
+        st.text(f"IMPATTO DELL'ACCUMULO (ULTIME 72H): {acc_val}")
+        st.text(f"VALORE PONDERATO FINALE: {fin_val}")
         
         st.markdown("---")
         st.subheader("Lettura Storico 72h")
