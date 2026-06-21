@@ -49,22 +49,21 @@ def calcola_accumulo_72ore():
         
         ispezione["righe_rilevate"] = len(df)
         col_c = [c for c in df.columns if 'crash' in c.lower()][0]
-        col_m = next((c for c in df.columns if 'valutazione' in c.lower()), None)
         
         ultimi_3 = df.tail(3).to_dict('records')
         accumulo = 0.0
-        dettaglio = []
+        dettaglio_log = []
         
         for i, etichetta in enumerate(['ieri', 'due_giorni', 'tre_giorni']):
             rec = ultimi_3[-(i+1)]
-            val = str(rec.get(col_c, '0')).lower()
-            if '1' in val or 'si' in val:
+            val_crash = str(rec.get(col_c, '0')).lower()
+            if '1' in val_crash or 'si' in val_crash:
                 peso = {'ieri': 1.0, 'due_giorni': 0.5, 'tre_giorni': 0.25}[etichetta]
                 accumulo += (1.5 * peso)
-                dettaglio.append(f"{etichetta}")
-            ispezione["dettaglio_giorni"].append({"giorno": etichetta, "crash": val})
+                dettaglio_log.append(f"{etichetta}")
+            ispezione["dettaglio_giorni"].append({"giorno": etichetta, "crash": val_crash})
             
-        return round(accumulo, 2), " + ".join(dettaglio), ispezione
+        return round(accumulo, 2), " + ".join(dettaglio_log), ispezione
     except Exception as e: return 0.0, str(e), ispezione
 
 @st.cache_data(ttl=60)
@@ -79,36 +78,37 @@ def recupera_meteo(data, citta):
         url_m = "https://api.open-meteo.com/v1/forecast"
         p = {"latitude": lat, "longitude": lon, "start_date": data.strftime("%Y-%m-%d"), "end_date": data.strftime("%Y-%m-%d"), "daily": "temperature_2m_max", "hourly": "relative_humidity_2m", "timezone": "Europe/Rome"}
         res = invia_richiesta_con_riconnessione(url_m, p)
-        data = res.json()
-        return float(data['daily']['temperature_2m_max'][0]), int(sum(data['hourly']['relative_humidity_2m'])/len(data['hourly']['relative_humidity_2m'])), None
+        data_m = res.json()
+        return float(data_m['daily']['temperature_2m_max'][0]), int(sum(data_m['hourly']['relative_humidity_2m'])/len(data_m['hourly']['relative_humidity_2m'])), None
     except: return 20.0, 50, "Errore"
 
 # --- UI ---
 st.title("🌱 Ogni Giorno")
-tab1, tab2 = st.tabs(["🌅 Mattina", "🌌 Sera"])
+tab1, tab2 = st.tabs(["🌅 Pianifica la Mattina", "🌌 Feedback Serale"])
 
 with tab1:
     col1, col2 = st.columns(2)
-    with col1: data_sel = st.date_input("Data", datetime.date.today()); pos = st.text_input("Posizione", st.session_state.posizione)
-    t, h, err = recupera_meteo(data_sel, pos)
-    with col2: temp = st.number_input("Temp (°C)", value=t); umidita = st.number_input("Umidità (%)", value=int(h))
+    with col1: data_sel = st.date_input("🗓️ Data", datetime.date.today()); pos = st.text_input("📍 Posizione", st.session_state.posizione)
+    t, h, _ = recupera_meteo(data_sel, pos)
+    with col2: temp = st.number_input("🌡️ Temperatura", value=t); umidita = st.number_input("💧 Umidità (%)", value=int(h))
     
-    sonno = st.selectbox("Sonno", ["discreta", "soddisfacente", "scarsa"])
-    energia = st.slider("Energia", 1, 10, 5)
-    siesta = st.checkbox("Siesta", value=st.session_state.siesta)
-    att = st.multiselect("Attività", ["ufficio", "lavoro da casa", "studio", "piccole commissioni", "visita", "fisioterapia", "riposo totale", "sociale"])
+    sonno = st.selectbox("💤 Sonno", ["discreta", "soddisfacente", "scarsa"])
+    energia = st.slider("⚡ Energia", 1, 10, 5)
+    siesta = st.checkbox("🛌 Siesta", value=st.session_state.siesta)
+    att = st.multiselect("📅 Attività", ["ufficio", "lavoro da casa", "studio", "piccole commissioni", "visita", "fisioterapia", "riposo totale", "sociale"])
 
-    if st.button("🚀 Calcola"):
+    if st.button("🚀 Calcola e Salva Mattina", use_container_width=True):
         acc, log, debug = calcola_accumulo_72ore()
-        val = round(max(1.0, min(10.0, 5.0 + (energia*0.3) + {"discreta": 0, "soddisfacente": 1.5, "scarsa": -1.5}[sonno] - acc)), 1)
-        st.session_state.update({'valore_sem': val, 'ispezione_log': debug, 'mattina_salvata': True})
-        st.success(f"Punteggio: {val}")
+        score = 5.0 + (energia*0.3) + {"discreta": 0, "soddisfacente": 1.5, "scarsa": -1.5}[sonno] - acc
+        st.session_state.update({'valore_sem': round(score, 1), 'ispezione_log': debug, 'mattina_salvata': True, 'attivita': att})
+        st.success(f"Punteggio stimato: {round(score, 1)}")
 
 with tab2:
     if st.session_state.mattina_salvata:
-        crash = st.radio("Crash?", ["0 - no", "1 - si"])
+        crash = st.radio("💥 Crash oggi?", ["0 - no", "1 - si"])
+        note = st.text_area("📝 Note")
         if st.button("💾 Registra"): st.balloons(); st.success("Dati inviati!")
-    else: st.warning("Compila la mattina prima!")
+    else: st.warning("⚠️ Salva prima la mattina!")
 
 with st.sidebar:
     st.header("🔬 Ispezione")
