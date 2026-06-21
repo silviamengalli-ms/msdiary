@@ -229,7 +229,7 @@ with tab_mattina:
             "Impatto Clima Esterno": round(p_temp, 2),
             "Bonus Strategico Siesta": bonus_siesta,
             "VALORE DI BASE ODIERNO": round(score_base, 2),
-            "SOTTRAZIONE ACCUMULO 72H": -accumulo,
+            "IMPATTO DELL'ACCUMULO (ULTIME 72H)": -accumulo,
             "VALORE PONDERATO FINALE": valore_calcolato,
             "Storico Database Usato": debug_data
         }
@@ -319,8 +319,8 @@ with st.sidebar:
             if voce != "Storico Database Usato":
                 if "VALORE PONDERATO FINALE" in voce:
                     st.metric(label=f"🏆 {voce}", value=valore)
-                elif "SOTTRAZIONE ACCUMULO" in voce:
-                    st.error(f"📉 Peso dell'Accumulo (Ultime 72h): {valore}")
+                elif "IMPATTO DELL'ACCUMULO" in voce:
+                    st.error(f"📉 Impatto dell'Accumulo (Ultime 72h): {valore}")
                 elif "VALORE DI BASE" in voce:
                     st.info(f"📊 Valore di Base Odierno: {valore}")
                 else:
@@ -341,4 +341,3 @@ with st.sidebar:
                     if "moltiplicatore_protezione" in giorno:
                         st.warning("⚠️ Scudo attivo (Sotto-stimato x1.5)")
                     st.write(f"**Penalità calcolata:** -{giorno['penalita_applicata']}")
-    
