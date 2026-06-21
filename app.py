@@ -83,4 +83,59 @@ def calcola_accumulo_72ore():
         
         ispezione["righe_rilevate"] = len(df)
         colonna_crash = [c for c in df.columns if 'crash' in c.lower()]
-        colonna
+        colonna_match = [c for c in df.columns if 'valutazione' in c.lower() or 'riscontro' in c.lower()]
+        
+        if not colonna_crash:
+            ispezione["status"] = "Colonna crash mancante"
+            return 0.0, "Nessun accumulo attivo (Manca colonna Crash)", ispezione
+            
+        col_c = colonna_crash[0]
+        col_m = colonna_match[0] if colonna_match else None
+        
+        ultimi_3_giorni = df.tail(3).to_dict('records')
+        giorni_etichette = ['ieri', 'due_giorni', 'tre_giorni']
+        pesi_temporali = {'ieri': 1.0, 'due_giorni': 0.5, 'tre_giorni': 0.25}
+        
+        accumulo_totale = 0.0
+        dettaglio_log = []
+        
+        for i, etichetta in enumerate(reversed(giorni_etichette)):
+            record = ultimi_3_giorni[i]  
+            val_crash = str(record.get(col_c, '0')).strip().lower()
+            val_match = str(record.get(col_m, '')).strip() if col_m else "N/D"
+            
+            info_giorno = {
+                "giorno": etichetta,
+                "crash_rilevato": val_crash,
+                "riscontro_serale": val_match,
+                "peso_temporale": pesi_temporali[etichetta],
+                "penalita_applicata": 0.0
+            }
+            
+            if val_crash.startswith('1') or 'si' in val_crash or 'sì' in val_crash:
+                impatto = 1.5 * pesi_temporali[etichetta]
+                if val_match == "Underestimated":
+                    impatto *= 1.5
+                    info_giorno["moltiplicatore_protezione"] = "Attivo (x1.5)"
+                
+                accumulo_totale += impatto
+                info_giorno["penalita_applicata"] = round(impatto, 2)
+                dettaglio_log.append(f"{etichetta} (-{round(impatto, 2)})")
+                
+            ispezione["dettaglio_giorni"].append(info_giorno)
+            
+        stringa_report = " + ".join(dettaglio_log) if dettaglio_log else "Nessun sovraccarico rilevato."
+        ispezione["status"] = "Calcolo completato con successo"
+        return round(accumulo_totale, 2), stringa_report, ispezione
+
+    except Exception as e:
+        ispezione["status"] = f"Errore: {str(e)}"
+        return 0.0, "Errore allineamento", ispezione
+
+# --- FUNZIONE METEO ---
+@st.cache_data(ttl=60)
+def recupera_meteo(data, nome_citta):
+    try:
+        url_geo = "https://geocoding-api.open-meteo.com/v1/search"
+        params_geo = {"name": nome_citta.strip(), "count": 1, "language": "it", "format": "json"}
+        risposta_geo = invia_richiesta_con_riconnessione(url_geo, params_geo
