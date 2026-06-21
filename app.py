@@ -195,7 +195,6 @@ with tab_mattina:
         
         somma_att = sum([pesi[a] for a in attivita])
         
-        # Gestione etichetta dinamica per l'ispezione visiva
         if len(attivita) > 1:
             label_attivita = "Sommatoria Pesi Attività"
             mult_attivita_extra = (len(attivita) - 1) * -0.3
@@ -203,7 +202,15 @@ with tab_mattina:
             label_attivita = "Peso Attività Singola" if len(attivita) == 1 else "Nessuna Attività Selezionata"
             mult_attivita_extra = 0.0
             
-        p_temp = 0.0 if temp < 28.0 else -0.5 - ((temp - 28.0) * 0.3)
+        # --- NUOVA LOGICA COMBINATA: CALORE + UMIDITÀ (HEAT INDEX EFFETTIVO) ---
+        temp_percepita = temp
+        if temp >= 27.0 and umidita > 60:
+            # Ogni 10% di umidità sopra il 60% aggiunge 0.5°C virtuali alla temperatura di calcolo
+            gradi_extra_umidita = ((umidita - 60) / 10.0) * 0.5
+            temp_percepita = temp + gradi_extra_umidita
+            
+        # Calcolo della penalità basato sulla temperatura reale corretta dall'afa
+        p_temp = 0.0 if temp_percepita < 28.0 else -0.5 - ((temp_percepita - 28.0) * 0.3)
         
         peso_sonno = {"discreta": 0.0, "soddisfacente": 1.0, "scarsa": -1.5}[sonno]
         peso_passi = {"fino a 1000": 0.5, "da 1001 a 3000": 0.0, "oltre 3000": -0.3}[passi]
@@ -220,7 +227,8 @@ with tab_mattina:
             "Impatto Target Passi": peso_passi,
             label_attivita: round(somma_att, 2),
             "Zavorra Sovrapposizione Impegni": round(mult_attivita_extra, 2),
-            "Penalizzazione Calore (°C)": round(p_temp, 2),
+            "Temperatura di Calcolo (con Afa)": f"{round(temp_percepita, 1)} °C",
+            "Penalizzazione Clima Totale": round(p_temp, 2),
             "Bonus Strategico Siesta": bonus_siesta,
             "SUBTOTALE ODIERNO BASE": round(score_base, 2),
             "DETRAZIONE SCUDO 72 ORE (ZAVORRA)": -zavorra,
@@ -324,7 +332,7 @@ with st.sidebar:
         st.subheader("Lettura Storico 72h")
         db_debug = st.session_state.ispezione_log["Storico Database Usato"]
         st.caption(f"Stato: {db_debug['status']}")
-        st.caption(f"Righe totali database: {db_debug['righe_rilevate']}")
+        st.caption(f"Righe totali database: {db_debug['gre_rilevate'] if 'gre_rilevate' in db_debug else db_debug.get('righe_rilevate', 0)}")
         
         if "dettaglio_giorni" in db_debug and db_debug["dettaglio_giorni"]:
             for giorno in db_debug["dettaglio_giorni"]:
