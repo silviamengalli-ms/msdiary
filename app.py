@@ -213,7 +213,7 @@ with tab_mattina:
         # --- LOGICA SONNO FISIOLOGICA ---
         peso_sonno = {"discreta": 0.0, "soddisfacente": 1.5, "scarsa": -1.5}[sonno]
         
-        # --- LOGICA PASSI E SIESTA PROPORZIONATA ---
+        # --- LOGICA PASSI E SIESTA BILANCIATA ---
         peso_passi = {"fino a 1000": 0.2, "da 1001 a 3000": -0.2, "oltre 3000": -0.5}[passi]
         bonus_siesta = 0.4 if siesta else 0.0
         
@@ -256,7 +256,7 @@ with tab_mattina:
         st.write("👈 Apri la barra laterale a sinistra per verificare i calcoli corretti.")
 
 # ==========================================
-# TAB SERA (CON STRUMENTO DI DEBUG ERRORE 400)
+# TAB SERA (CON STRINGHE CRASH ALLINEATE AL MODULO)
 # ==========================================
 with tab_sera:
     if not st.session_state.mattina_salvata:
@@ -265,9 +265,10 @@ with tab_sera:
         st.subheader("Com'è andata la giornata?")
         st.markdown(f"Punteggio stimato stamattina: **{st.session_state.valore_sem}**")
         
+        # Allineato al formato esatto richiesto dal tuo modulo Google
         crash_scelta = st.radio(
             "💥 C'è stato un crash/sovraccarico oggi?", 
-            ["0 - No", "1 - Sì"], index=0, horizontal=True
+            ["0 - no", "1 - si"], index=0, horizontal=True
         )
         
         valutazione = st.selectbox("Il punteggio del mattino era corretto? (Riscontro):", ["Match", "Overestimated", "Underestimated"])
@@ -298,7 +299,6 @@ with tab_sera:
             if st.session_state.attivita: payload[ENTRY_ID['attivita']] = st.session_state.attivita[0]
             else: payload[ENTRY_ID['attivita']] = "riposo totale"
             
-            # --- BLOCCO ISPEZIONE PAYLOAD ED ERRORE ---
             st.markdown("---")
             st.subheader("🔍 Monitoraggio Invio Dati")
             with st.expander("Visualizza il pacchetto JSON spedito a Google"):
@@ -313,7 +313,7 @@ with tab_sera:
                 else: 
                     st.error(f"❌ Errore di trasmissione (Codice HTTP {r.status_code}).")
                     with st.expander("Analisi dettagliata della risposta del server Google"):
-                        st.code(r.text[:800]) # Mostra cosa risponde Google per individuare il campo rifiutato
+                        st.code(r.text[:800]) 
             except Exception as e: 
                 st.error(f"⚠️ Errore connessione modulo: {e}")
 
