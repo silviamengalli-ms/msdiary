@@ -321,4 +321,14 @@ with st.sidebar:
         st.subheader("Lettura Storico 72h")
         db_debug = st.session_state.ispezione_log["Storico Database Usato"]
         st.caption(f"Stato: {db_debug['status']}")
-        st.caption(
+        st.caption(f"Righe totali database: {db_debug['righe_rilevate']}")
+        
+        if "dettaglio_giorni" in db_debug and db_debug["dettaglio_giorni"]:
+            for giorno in db_debug["dettaglio_giorni"]:
+                with st.expander(f"📅 Analisi {giorno['giorno'].upper()}"):
+                    st.write(f"**Crash registrato:** `{giorno['crash_rilevato']}`")
+                    st.write(f"**Riscontro serale:** `{giorno['riscontro_serale']}`")
+                    st.write(f"**Peso temporale:** {giorno['peso_temporale'] * 100}%")
+                    if "moltiplicatore_protezione" in giorno:
+                        st.warning("⚠️ Scudo attivo (Sotto-stimato x1.5)")
+                    st.write(f"**Penalità calcolata:** -{giorno['penalita_applicata']}")
