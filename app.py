@@ -195,9 +195,12 @@ with tab_mattina:
         
         somma_att = sum([pesi[a] for a in attivita])
         
+        # Gestione etichetta dinamica per l'ispezione visiva
         if len(attivita) > 1:
+            label_attivita = "Sommatoria Pesi Attività"
             mult_attivita_extra = (len(attivita) - 1) * -0.3
         else:
+            label_attivita = "Peso Attività Singola" if len(attivita) == 1 else "Nessuna Attività Selezionata"
             mult_attivita_extra = 0.0
             
         p_temp = 0.0 if temp < 28.0 else -0.5 - ((temp - 28.0) * 0.3)
@@ -215,7 +218,7 @@ with tab_mattina:
             "Contributo Energia Rilevato": round(energia * 0.3, 2),
             "Impatto Qualità Sonno": peso_sonno,
             "Impatto Target Passi": peso_passi,
-            "Sommatoria Pesi Attività": round(somma_att, 2),
+            label_attivita: round(somma_att, 2),
             "Zavorra Sovrapposizione Impegni": round(mult_attivita_extra, 2),
             "Penalizzazione Calore (°C)": round(p_temp, 2),
             "Bonus Strategico Siesta": bonus_siesta,
