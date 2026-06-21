@@ -43,7 +43,7 @@ stato_iniziale = {
     'attivita': [], 
     'siesta': False,  
     'valore_sem': None,
-    'ispezione_log': {}  # Per conservare i calcoli trasparenti
+    'ispezione_log': {}
 }
 
 for chiave, valore in stato_iniziale.items():
@@ -64,17 +64,16 @@ def invia_richiesta_con_riconnessione(url, parametri):
             time.sleep(random.uniform(0.5, 2.0))
     return None
 
-# --- FUNZIONE INTERNA: CALCOLO DIRETTO DELLE 72 ORE CON LOGGING ---
+# --- FUNZIONE INTERNA: CALCOLO DIRETTO DELLE 72 ORE CON LOGGING FLESSIBILE ---
 def calcola_zavorra_72ore():
     ispezione = {
         "status": "Inizializzato",
         "righe_rilevate": 0,
-        "dettaglio_giorni": [],
-        "moltiplicatori_attivi": False
+        "dettaglio_giorni": []
     }
     try:
         conn = st.connection("gsheets", type=GSheetsConnection)
-        df = conn.read(ttl="1m") # Ridotto il ttl a 1 minuto per vedere subito i cambiamenti
+        df = conn.read(ttl="1m") 
         
         if df is None or len(df) < 3:
             ispezione["status"] = "Storico insufficiente"
@@ -98,10 +97,10 @@ def calcola_zavorra_72ore():
         zavorra_totale = 0.0
         dettaglio_log = []
         
-        # Scansione dinamica a ritroso dei 3 giorni
+        # Mappiamo i giorni al contrario per l'analisi cronologica a ritroso
         for i, etichetta in enumerate(reversed(giorni_etichette)):
             record = ultimi_3_giorni[i]
-            val_crash = str(record.get(col_c, '0')).strip()
+            val_crash = str(record.get(col_c, '0')).strip().lower()
             val_match = str(record.get(col_m, '')).strip() if col_m else "N/D"
             
             info_giorno = {
@@ -112,16 +111,16 @@ def calcola_zavorra_72ore():
                 "penalita_applicata": 0.0
             }
             
-            if val_crash.startswith('1'):
+            # FIX CRASH FLESSIBILE: rileva "si", "sì", "1" o "1 - sì"
+            if val_crash.startswith('1') or 'si' in val_crash or 'sì' in val_crash:
                 impatto = 1.5 * pesi_temporali[etichetta]
                 if val_match == "Underestimated":
                     impatto *= 1.5
                     info_giorno["moltiplicatore_protezione"] = "Attivo (x1.5)"
-                    ispezione["moltiplicatore_attivi"] = True
                 
                 zavorra_totale += impatto
-                info_giorno["penalita_applicata"] = impatto
-                dettaglio_log.append(f"{etichetta} (-{impatto})")
+                info_giorno["penalita_applicata"] = round(impatto, 2)
+                dettaglio_log.append(f"{etichetta} (-{round(impatto, 2)})")
                 
             ispezione["dettaglio_giorni"].append(info_giorno)
             
@@ -187,7 +186,6 @@ with tab_mattina:
     attivita = st.multiselect("📅 Attività in programma:", ["ufficio", "lavoro da casa", "studio", "piccole commissioni", "visita", "fisioterapia", "riposo totale", "sociale"])
 
     if st.button("🚀 Calcola e Salva Mattina", use_container_width=True):
-        # 1. RECUPERO DATI E ANALISI SCATOLA NERA
         zavorra, log_zavorra, debug_data = calcola_zavorra_72ore()
         
         pesi = {
@@ -198,18 +196,18 @@ with tab_mattina:
         
         somma_att = sum([pesi[a] for a in attivita])
         mult_attivita_extra = (len(attivita) - 1) * -0.3 if len(attivita) > 1 else 0.0
+        
+        # Logica meteo originale (Invariata come richiesto)
         p_temp = 0.0 if temp < 28.0 else -0.5 - ((temp - 28.0) * 0.3)
         
         peso_sonno = {"discreta": 0.0, "soddisfacente": 1.0, "scarsa": -1.5}[sonno]
         peso_passi = {"fino a 1000": 0.5, "da 1001 a 3000": 0.0, "oltre 3000": -0.3}[passi]
         bonus_siesta = 0.3 if siesta else 0.0
         
-        # Equazione base
         score_base = 5.0 + (energia * 0.3) + peso_sonno + peso_passi + somma_att + mult_attivita_extra + p_temp + bonus_siesta
         score_finale = score_base - zavorra
         valore_calcolato = round(max(1.0, min(10.0, score_finale)), 1)
         
-        # Salvataggio log dettagliati per la sidebar
         ispezione_giornata = {
             "Punto di Partenza Fisso": 5.0,
             "Contributo Energia Rilevato": round(energia * 0.3, 2),
@@ -241,7 +239,7 @@ with tab_mattina:
         if valore_calcolato <= 4.5: st.error(f"🔴 BOLLINO ROSSO: {valore_calcolato} Dai priorità al riposo 🐢")
         elif valore_calcolato <= 7.0: st.warning(f"🟡 BOLLINO GIALLO: {valore_calcolato} Giornata regolare, procedi con calma 🐘")
         else: st.success(f"🟢 BOLLINO VERDE: {valore_calcolato} Ottima carica! 🦋")
-        st.write("👈 Apri la barra laterale a sinistra per vedere i calcoli esatti voce per voce!")
+        st.write("👈 Apri la barra laterale a sinistra per verificare l'impatto dello Scudo aggiornato.")
 
 # ==========================================
 # TAB SERA
@@ -303,7 +301,7 @@ with tab_sera:
 with st.sidebar:
     st.header("🔬 Ispezione Algoritmo")
     if not st.session_state.ispezione_log:
-        st.info("Esegui un calcolo nel Tab Mattina per attivare i grafici di telemetria.")
+        st.info("Esegui un calcolo nel Tab Mattina per attivare la telemetria.")
     else:
         st.subheader("Matematica Odierna")
         for voce, valore in st.session_state.ispezione_log.items():
@@ -326,9 +324,9 @@ with st.sidebar:
         if "dettaglio_giorni" in db_debug and db_debug["dettaglio_giorni"]:
             for giorno in db_debug["dettaglio_giorni"]:
                 with st.expander(f"📅 Analisi {giorno['giorno'].upper()}"):
-                    st.write(f"**Crash registrato:** {giorno['crash_rilevato']}")
-                    st.write(f"**Riscontro serale:** {giorno['riscontro_serale']}")
+                    st.write(f"**Crash registrato:** `{giorno['crash_rilevato']}`")
+                    st.write(f"**Riscontro serale:** `{giorno['riscontro_serale']}`")
                     st.write(f"**Peso temporale:** {giorno['peso_temporale'] * 100}%")
                     if "moltiplicatore_protezione" in giorno:
-                        st.warning("⚠️ Scudo attivo: Modello sotto-stimato nel passato!")
+                        st.warning("⚠️ Scudo attivo (Sotto-stimato x1.5)")
                     st.write(f"**Penalità calcolata:** -{giorno['penalita_applicata']}")
