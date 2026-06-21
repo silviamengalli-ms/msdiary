@@ -4,41 +4,28 @@ import requests
 import time
 import random
 import pandas as pd
-import plotly.express as px
 
 # --- CONFIGURAZIONE ---
-st.set_page_config(page_title="La Mia Carica - MS Diary", layout="centered", page_icon="🔋")
+st.set_page_config(page_title="La Mia Carica - MS Diary (Sviluppo)", layout="centered", page_icon="🔋")
 
-# URL DI INVIO DATI (Punta al formResponse del modulo)
-URL_MODULO = "https://docs.google.com/forms/d/e/1FAIpQLSfsNrtCcCMKrQ22pM-7NfrW7F9xWvtUSZPNBu83AgV9ZyWtDQ/formResponse"
+# URL DI INVIO DATI (Punta al modulo dell'ambiente SVILUPPO)
+URL_MODULO = "https://docs.google.com/forms/d/e/1FAIpQLSdtqnrzl71uqLgb1-wY5yw3R2vo7m8-nSwGgNf7ZtbrchqlYw/formResponse"
 
-# URL CONFIGURATO CON IL TUO FOGLIO GOOGLE REALE
-URL_FOGLIO_DATI = "https://docs.google.com/spreadsheets/d/1eSnvfouOdaL-sakQgwKCItUEKXN-96ECF93KD96cx-E/export?format=csv"
-
-# MAPPATURA DEI NOMI DELLE COLONNE SUL TUO FOGLIO GOOGLE
-# Se l'app ti segnala un errore, verifica che questi testi corrispondano esattamente alle intestazioni delle colonne del foglio!
-COLONNE_FOGLIO = {
-    'data': '🗓️ Data:',                          # Es. 'Informazioni cronologiche' oppure il nome della tua domanda sulla data
-    'energia': '⚡ Energia al risveglio (1-10):', 
-    'dolore': 'Livello dolore avvertito (1-10):', 
-    'semaforo': 'Semaforo'                        
-}
-
-# MAPPATURA INPUT GOOGLE MODULI
+# MAPPATURA ESATTA AGGIORNATA PER L'AMBIENTE SVILUPPO
 ENTRY_ID = {
     'data': 'entry.2022449610',
     'posizione': 'entry.1412086707',
     'temp': 'entry.1900939990',
-    'umidita': 'entry.2086318809',
+    'umidita': 'entry.1051612516',
     'sonno': 'entry.2076355969',
     'energia': 'entry.1596414247',
     'attivita': 'entry.1595201387',
     'passi': 'entry.28384771',
     'semaforo': 'entry.625659299',
-    'siesta_form': 'entry.1353678088', 
+    'valutazione': 'entry.375319797',
     'dolore': 'entry.672372933',
-    'valutazione': 'entry.2023032977',
-    'note': 'entry.158362423'
+    'note': 'entry.158362423',
+    'crash': 'entry.998711008'  # 
 }
 
 # --- STATO INIZIALE (Inizializzazione Sicura della memoria) ---
@@ -101,11 +88,11 @@ def recupera_meteo(data, nome_citta):
     except Exception as e: return 20.0, 50, str(e)
 
 # --- INTERFACCIA UTENTE ---
-st.title("🔋 La Mia Carica")
+st.title("🔋 La Mia Carica (Sandbox Sviluppo)")
 st.markdown("---")
 
-# Creazione dei 3 TAB
-tab_mattina, tab_sera, tab_stats = st.tabs(["🌅 Pianifica la Mattina", "🌌 Feedback Serale", "📊 Statistiche & Trend"])
+# Creazione dei TAB operativi
+tab_mattina, tab_sera = st.tabs(["🌅 Pianifica la Mattina", "🌌 Feedback Serale"])
 
 # ==========================================
 # TAB MATTINA
@@ -125,10 +112,21 @@ with tab_mattina:
     passi = st.selectbox("🚶 Passi previsti:", ["fino a 1000", "da 1001 a 3000", "oltre 3000"])
     energia = st.slider("⚡ Energia al risveglio (1-10):", 1, 10, 5)
     siesta = st.checkbox("🛌 Pianifico una siesta strategica/efficace oggi", value=st.session_state.siesta)
-    attivita = st.multiselect("📅 Attività in programma:", ["ufficio", "lavoro da casa", "piccole commissioni", "visita", "fisioterapia", "riposo totale", "sociale"])
+    
+    attivita = st.multiselect("📅 Attività in programma:", ["ufficio", "lavoro da casa", "studio", "piccole commissioni", "visita", "fisioterapia", "riposo totale", "sociale"])
 
     if st.button("🚀 Calcola e Salva Mattina", use_container_width=True):
-        pesi = {"ufficio": -0.5, "lavoro da casa": -0.2, "piccole commissioni": -0.4, "visita": -0.5, "fisioterapia": -0.5, "riposo totale": 0.5, "sociale": -0.7}
+        pesi = {
+            "ufficio": -0.5, 
+            "lavoro da casa": -0.2, 
+            "studio": -0.3, 
+            "piccole commissioni": -0.4, 
+            "visita": -0.5, 
+            "fisioterapia": -0.5, 
+            "riposo totale": 0.5, 
+            "sociale": -0.7
+        }
+        
         somma_att = sum([pesi[a] for a in attivita])
         if len(attivita) > 1: somma_att += (len(attivita) - 1) * -0.3
         p_temp = 0.0 if temp < 28.0 else -0.5 - ((temp - 28.0) * 0.3)
@@ -155,6 +153,15 @@ with tab_sera:
     else:
         st.subheader("Com'è andata la giornata?")
         st.markdown(f"Punteggio stimato stamattina: **{st.session_state.valore_sem}**")
+        
+        # --- NUOVO ELEMENTO: SELETTORE CRASH (Interfaccia Umana) ---
+        crash_scelta = st.radio(
+            "💥 C'è stato un crash/sovraccarico oggi?", 
+            ["0 - No", "1 - Sì"], 
+            index=0, 
+            horizontal=True
+        )
+        
         valutazione = st.selectbox("Il punteggio del mattino era corretto? (Riscontro):", ["Match", "Overestimated", "Underestimated"])
         dolore = st.slider("Livello dolore avvertito (1-10):", 1, 10, 1)
         note = st.text_area("Note o riflessioni serali:", placeholder="Scrivi qui le tue annotazioni...")
@@ -164,12 +171,37 @@ with tab_sera:
             note_finali = f"[Attività svolte: {stringa_attivita_completa}] {note}".strip()
             semaforo_protetto = max(1, min(10, int(round(st.session_state.valore_sem))))
             
+            # Costruzione payload completo con modifiche ambiente sviluppo
             payload = {
-                ENTRY_ID['data']: st.session_state.mattina_data.strftime("%d/%m/%Y"), ENTRY_ID['posizione']: st.session_state.posizione,
-                ENTRY_ID['temp']: str(int(round(st.session_state.temp))), ENTRY_ID['umidita']: str(int(st.session_state.umidita)),
-                ENTRY_ID['sonno']: st.session_state.sonno, ENTRY_ID['energia']: str(int(st.session_state.energia)),
-                ENTRY_ID['passi']: st.session_state.passi, ENTRY_ID['semaforo']: str(semaforo_protetto),
-                ENTRY_ID['siesta_form']: "si" if st.session_state.siesta else "no", ENTRY_ID['valutazione']: valutazione,
-                ENTRY_ID['dolore']: str(int(dolore)), ENTRY_ID['note']: note_finali
+                ENTRY_ID['data']: st.session_state.mattina_data.strftime("%d/%m/%Y"), 
+                ENTRY_ID['posizione']: st.session_state.posizione,
+                ENTRY_ID['temp']: str(int(round(st.session_state.temp))), 
+                ENTRY_ID['umidita']: str(int(st.session_state.umidita)),
+                ENTRY_ID['sonno']: st.session_state.sonno, 
+                ENTRY_ID['energia']: str(int(st.session_state.energia)),
+                ENTRY_ID['passi']: st.session_state.passi, 
+                ENTRY_ID['semaforo']: str(semaforo_protetto),
+                ENTRY_ID['valutazione']: valutazione, # Mappatura aggiornata
+                ENTRY_ID['dolore']: str(int(dolore)), 
+                ENTRY_ID['note']: note_finali,
+                ENTRY_ID['crash']: crash_scelta  # <--- Invio del valore "0 - No" o "1 - Sì"
             }
-            if st.session_state.attivita: payload[ENTRY_ID['attivita']] = st
+            
+            # Gestione opzionale del campo siesta (presente nel form originale ma non mappato in ENTRY_ID sviluppo)
+            # Se nel modulo di sviluppo non c'è il campo siesta, questa riga impedisce errori di invio.
+            if 'siesta_form' in ENTRY_ID:
+                payload[ENTRY_ID['siesta_form']] = "si" if st.session_state.siesta else "no"
+                
+            if st.session_state.attivita: payload[ENTRY_ID['attivita']] = st.session_state.attivita[0]
+            else: payload[ENTRY_ID['attivita']] = "riposo totale"
+            
+            try:
+                r = requests.post(URL_MODULO, data=payload)
+                if r.status_code == 200:
+                    st.balloons()
+                    st.write("✅ Dati registrati nel database con successo! Buona notte 🌟")
+                    st.session_state.mattina_salvata = False 
+                else: 
+                    st.error(f"❌ Errore di invio (Codice HTTP {r.status_code}). Verifica l'ID del campo Crash.")
+            except Exception as e: 
+                st.error(f"⚠️ Impossibile raggiungere Google Moduli: {e}")
