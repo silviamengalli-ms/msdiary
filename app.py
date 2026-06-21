@@ -7,7 +7,7 @@ import pandas as pd
 from streamlit_gsheets import GSheetsConnection
 
 # --- CONFIGURAZIONE PRINCIPALE ---
-st.set_page_config(page_title="La Mia Carica - MS Diary", layout="centered", page_icon="🔋")
+st.set_page_config(page_title="Ogni Giorno - MS Diary", layout="centered", page_icon="🌱")
 
 # URL DI INVIO DATI PRINCIPALE (formResponse)
 URL_MODULO = "https://docs.google.com/forms/d/e/1FAIpQLSfsNrtCcCMKrQ22pM-7NfrW7F9xWvtUSZPNBu83AgV9ZyWtDQ/formResponse"
@@ -64,8 +64,8 @@ def invia_richiesta_con_riconnessione(url, parametri):
             time.sleep(random.uniform(0.5, 2.0))
     return None
 
-# --- FUNZIONE INTERNA: CALCOLO DIRETTO DELLE 72 ORE ---
-def calcola_zavorra_72ore():
+# --- FUNZIONE INTERNA: CALCOLO DIRETTO DELLE 72 ORE (ACCUMULO) ---
+def calcola_accumulo_72ore():
     ispezione = {
         "status": "Inizializzato",
         "righe_rilevate": 0,
@@ -85,7 +85,7 @@ def calcola_zavorra_72ore():
         
         if not colonna_crash:
             ispezione["status"] = "Colonna crash mancante"
-            return 0.0, "Nessuna zavorra attiva (Manca colonna Crash)", ispezione
+            return 0.0, "Nessun accumulo attivo (Manca colonna Crash)", ispezione
             
         col_c = colonna_crash[0]
         col_m = colonna_match[0] if colonna_match else None
@@ -94,7 +94,7 @@ def calcola_zavorra_72ore():
         giorni_etichette = ['ieri', 'due_giorni', 'tre_giorni']
         pesi_temporali = {'ieri': 1.0, 'due_giorni': 0.5, 'tre_giorni': 0.25}
         
-        zavorra_totale = 0.0
+        accumulo_totale = 0.0
         dettaglio_log = []
         
         for i, etichetta in enumerate(reversed(giorni_etichette)):
@@ -116,7 +116,7 @@ def calcola_zavorra_72ore():
                     impatto *= 1.5
                     info_giorno["moltiplicatore_protezione"] = "Attivo (x1.5)"
                 
-                zavorra_totale += impatto
+                accumulo_totale += impatto
                 info_giorno["penalita_applicata"] = round(impatto, 2)
                 dettaglio_log.append(f"{etichetta} (-{round(impatto, 2)})")
                 
@@ -124,7 +124,7 @@ def calcola_zavorra_72ore():
             
         stringa_report = " + ".join(dettaglio_log) if dettaglio_log else "Nessun sovraccarico rilevato."
         ispezione["status"] = "Calcolo completato con successo"
-        return round(zavorra_totale, 2), stringa_report, ispezione
+        return round(accumulo_totale, 2), stringa_report, ispezione
 
     except Exception as e:
         ispezione["status"] = f"Errore: {str(e)}"
@@ -157,7 +157,7 @@ def recupera_meteo(data, nome_citta):
     except Exception as e: return 20.0, 50, str(e)
 
 # --- INTERFACCIA UTENTE ---
-st.title("🔋 La Mia Carica")
+st.title("🌱 Ogni Giorno")
 st.markdown("---")
 
 tab_mattina, tab_sera = st.tabs(["🌅 Pianifica la Mattina", "🌌 Feedback Serale"])
@@ -184,7 +184,7 @@ with tab_mattina:
     attivita = st.multiselect("📅 Attività in programma:", ["ufficio", "lavoro da casa", "studio", "piccole commissioni", "visita", "fisioterapia", "riposo totale", "sociale"])
 
     if st.button("🚀 Calcola e Salva Mattina", use_container_width=True):
-        zavorra, log_zavorra, debug_data = calcola_zavorra_72ore()
+        accumulo, log_accumulo, debug_data = calcola_accumulo_72ore()
         
         # --- CALCOLO IMPATTO ATTIVITÀ ---
         pesi = {
@@ -202,14 +202,12 @@ with tab_mattina:
             label_attivita = "Peso Attività Singola" if len(attivita) == 1 else "Nessuna Attività Selezionata"
             mult_attivita_extra = 0.0
             
-        # --- NUOVA LOGICA COMBINATA: CALORE + UMIDITÀ (HEAT INDEX EFFETTIVO) ---
+        # --- LOGICA COMBINATA: CALORE + UMIDITÀ ---
         temp_percepita = temp
         if temp >= 27.0 and umidita > 60:
-            # Ogni 10% di umidità sopra il 60% aggiunge 0.5°C virtuali alla temperatura di calcolo
             gradi_extra_umidita = ((umidita - 60) / 10.0) * 0.5
             temp_percepita = temp + gradi_extra_umidita
             
-        # Calcolo della penalità basato sulla temperatura reale corretta dall'afa
         p_temp = 0.0 if temp_percepita < 28.0 else -0.5 - ((temp_percepita - 28.0) * 0.3)
         
         peso_sonno = {"discreta": 0.0, "soddisfacente": 1.0, "scarsa": -1.5}[sonno]
@@ -217,7 +215,7 @@ with tab_mattina:
         bonus_siesta = 0.3 if siesta else 0.0
         
         score_base = 5.0 + (energia * 0.3) + peso_sonno + peso_passi + somma_att + mult_attivita_extra + p_temp + bonus_siesta
-        score_finale = score_base - zavorra
+        score_finale = score_base - accumulo
         valore_calcolato = round(max(1.0, min(10.0, score_finale)), 1)
         
         ispezione_giornata = {
@@ -230,8 +228,8 @@ with tab_mattina:
             "Temperatura di Calcolo (con Afa)": f"{round(temp_percepita, 1)} °C",
             "Penalizzazione Clima Totale": round(p_temp, 2),
             "Bonus Strategico Siesta": bonus_siesta,
-            "SUBTOTALE ODIERNO BASE": round(score_base, 2),
-            "DETRAZIONE SCUDO 72 ORE (ZAVORRA)": -zavorra,
+            "VALORE BASE DI OGGI": round(score_base, 2),
+            "SOTTRAZIONE ACCUMULO 72H": -accumulo,
             "RISULTATO FINALE MATEMATICO": valore_calcolato,
             "Storico Database Usato": debug_data
         }
@@ -244,10 +242,10 @@ with tab_mattina:
         })
         
         st.markdown("---") 
-        if zavorra > 0:
-            st.warning(f"🛡️ **Scudo 72 Ore Attivo**: Il punteggio iniziale è stato ridotto preventivamente di **-{zavorra} punti** per sovraccarichi passati. ({log_zavorra})")
+        if accumulo > 0:
+            st.warning(f"🛡️ **Scudo Carico Attivo**: Il punteggio iniziale risente di un **Accumulo di stanchezza pari a -{accumulo} punti** dovuto ai giorni passati. ({log_accumulo})")
         else:
-            st.caption(f"📊 Controllo Storico: {log_zavorra}")
+            st.caption(f"📊 Controllo Storico: {log_accumulo}")
             
         if valore_calcolato <= 4.5: st.error(f"🔴 BOLLINO ROSSO: {valore_calcolato} Dai priorità al riposo 🐢")
         elif valore_calcolato <= 7.0: st.warning(f"🟡 BOLLINO GIALLO: {valore_calcolato} Giornata regolare, procedi con calma 🐘")
@@ -321,10 +319,10 @@ with st.sidebar:
             if voce != "Storico Database Usato":
                 if "FINALE" in voce:
                     st.metric(label=f"🏆 {voce}", value=valore)
-                elif "ZAVORRA" in voce:
-                    st.error(f"📉 {voce}: {valore}")
-                elif "SUBTOTALE" in voce:
-                    st.info(f"📊 {voce}: {valore}")
+                elif "ACCUMULO" in voce:
+                    st.error(f"📉 Peso dell'Accumulo (Ultime 72h): {valore}")
+                elif "BASE" in voce:
+                    st.info(f"📊 Energia Potenziale di Oggi: {valore}")
                 else:
                     st.text(f"• {voce}: {valore}")
         
@@ -332,7 +330,7 @@ with st.sidebar:
         st.subheader("Lettura Storico 72h")
         db_debug = st.session_state.ispezione_log["Storico Database Usato"]
         st.caption(f"Stato: {db_debug['status']}")
-        st.caption(f"Righe totali database: {db_debug['gre_rilevate'] if 'gre_rilevate' in db_debug else db_debug.get('righe_rilevate', 0)}")
+        st.caption(f"Righe totali database: {db_debug['righe_rilevate'] if 'righe_rilevate' in db_debug else 0}")
         
         if "dettaglio_giorni" in db_debug and db_debug["dettaglio_giorni"]:
             for giorno in db_debug["dettaglio_giorni"]:
