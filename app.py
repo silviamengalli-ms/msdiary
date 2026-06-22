@@ -30,6 +30,47 @@ ENTRY_ID = {
     'crash': 'entry.592499523'
 }
 
+# --- ATTIVITÀ STRUTTURATE PER FUTURO ALGORITMO ---
+ATTIVITA_OPZIONI = [
+    "ufficio",
+    "lavoro da casa",
+    "studio",
+    "piccole commissioni",
+    "visita",
+    "fisioterapia",
+    "riposo totale",
+    "sociale"
+]
+
+PESI_ATTIVITA = {
+    "ufficio": -0.5,
+    "lavoro da casa": -0.2,
+    "studio": -0.3,
+    "piccole commissioni": -0.4,
+    "visita": -0.5,
+    "fisioterapia": -0.5,
+    "riposo totale": 0.5,
+    "sociale": -0.7
+}
+
+ATTIVITA_DOMESTICHE = {
+    "studio",
+    "lavoro da casa",
+    "riposo totale"
+}
+
+# Nuovi campi tecnici Google Moduli: 1 = attività selezionata, 0 = attività non selezionata
+ENTRY_ID_ATTIVITA_BINARIE = {
+    "ufficio": "entry.251609888",
+    "lavoro da casa": "entry.526360955",
+    "studio": "entry.1594094667",
+    "piccole commissioni": "entry.349175663",
+    "visita": "entry.83072921",
+    "fisioterapia": "entry.194539756",
+    "riposo totale": "entry.583848141",
+    "sociale": "entry.161079508"
+}
+
 # --- STATO INIZIALE ---
 stato_iniziale = {
     'mattina_salvata': False,
@@ -196,6 +237,29 @@ def recupera_meteo(data, nome_citta):
     except Exception as e:
         return 20.0, 50, str(e)
 
+# --- FUNZIONE: ATTIVITÀ STRUTTURATE NEL PAYLOAD ---
+def aggiungi_attivita_strutturate_al_payload(payload, attivita_selezionate):
+    """
+    Mantiene compatibilità con il vecchio campo 'attivita',
+    ma aggiunge anche colonne binarie 1/0 per il futuro algoritmo.
+    """
+
+    attivita_selezionate = attivita_selezionate or []
+    set_attivita = set(attivita_selezionate)
+
+    # Campo vecchio: salvo ancora una attività principale per compatibilità.
+    if attivita_selezionate:
+        payload[ENTRY_ID['attivita']] = attivita_selezionate[0]
+    else:
+        payload[ENTRY_ID['attivita']] = "riposo totale"
+
+    # Campi nuovi: una colonna per attività.
+    for nome_attivita, entry_id in ENTRY_ID_ATTIVITA_BINARIE.items():
+        if entry_id:
+            payload[entry_id] = "1" if nome_attivita in set_attivita else "0"
+
+    return payload
+
 # --- INTERFACCIA UTENTE ---
 st.title("🌱 Ogni Giorno")
 st.markdown("---")
@@ -230,34 +294,14 @@ with tab_mattina:
     
     attivita = st.multiselect(
         "📅 Attività in programma:",
-        [
-            "ufficio",
-            "lavoro da casa",
-            "studio",
-            "piccole commissioni",
-            "visita",
-            "fisioterapia",
-            "riposo totale",
-            "sociale"
-        ]
+        ATTIVITA_OPZIONI
     )
 
     if st.button("🚀 Calcola e Salva Mattina", use_container_width=True):
         accumulo, log_accumulo, debug_data = calcola_accumulo_72ore()
         
         # --- CALCOLO IMPATTO ATTIVITÀ ---
-        pesi = {
-            "ufficio": -0.5,
-            "lavoro da casa": -0.2,
-            "studio": -0.3, 
-            "piccole commissioni": -0.4,
-            "visita": -0.5,
-            "fisioterapia": -0.5, 
-            "riposo totale": 0.5,
-            "sociale": -0.7
-        }
-        
-        somma_att = sum([pesi[a] for a in attivita])
+        somma_att = sum([PESI_ATTIVITA[a] for a in attivita])
         
         if len(attivita) > 1:
             label_attivita = "Impatto Sommatoria Attività"
@@ -268,10 +312,8 @@ with tab_mattina:
             
         # --- LOGICA COMBINATA: CALORE + UMIDITÀ ---
         # Se sono selezionate solo attività domestiche, la penalizzazione climatica esterna viene esclusa.
-        attivita_domestiche = {"studio", "lavoro da casa", "riposo totale"}
-
         solo_attivita_domestiche = (
-            len(attivita) > 0 and all(a in attivita_domestiche for a in attivita)
+            len(attivita) > 0 and all(a in ATTIVITA_DOMESTICHE for a in attivita)
         )
 
         temp_percepita = temp
@@ -404,11 +446,11 @@ with tab_sera:
                 ENTRY_ID['note']: note_finali,
                 ENTRY_ID['crash']: crash_scelta 
             }
-            
-            if st.session_state.attivita:
-                payload[ENTRY_ID['attivita']] = st.session_state.attivita[0]
-            else:
-                payload[ENTRY_ID['attivita']] = "riposo totale"
+
+            payload = aggiungi_attivita_strutturate_al_payload(
+                payload,
+                st.session_state.attivita
+            )
             
             try:
                 r = requests.post(URL_MODULO, data=payload)
