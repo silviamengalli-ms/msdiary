@@ -15,7 +15,7 @@ ALGORITHM_VERSION = "v1.4_componenti_algoritmo"
 # Debug temporaneo:
 # True = mostra il payload e blocca l'invio al Google Form
 # False = invia normalmente i dati al Google Form
-DEBUG_PAYLOAD = True
+DEBUG_PAYLOAD = False
 
 # URL DI INVIO DATI PRINCIPALE (formResponse)
 URL_MODULO = "https://docs.google.com/forms/d/e/1FAIpQLSfsNrtCcCMKrQ22pM-7NfrW7F9xWvtUSZPNBu83AgV9ZyWtDQ/formResponse"
