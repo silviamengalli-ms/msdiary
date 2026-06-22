@@ -12,6 +12,11 @@ st.set_page_config(page_title="Ogni Giorno - MS Diary", layout="centered", page_
 # Versione algoritmo
 ALGORITHM_VERSION = "v1.4_componenti_algoritmo"
 
+# Debug temporaneo:
+# True = mostra il payload e blocca l'invio al Google Form
+# False = invia normalmente i dati al Google Form
+DEBUG_PAYLOAD = True
+
 # URL DI INVIO DATI PRINCIPALE (formResponse)
 URL_MODULO = "https://docs.google.com/forms/d/e/1FAIpQLSfsNrtCcCMKrQ22pM-7NfrW7F9xWvtUSZPNBu83AgV9ZyWtDQ/formResponse"
 
@@ -102,12 +107,21 @@ stato_iniziale = {
     'siesta': False,  
     'valore_sem': None,
     'ispezione_log': {},
-    'componenti_algoritmo': {}
+    'componenti_algoritmo': {},
+    'algorithm_version_sessione': ALGORITHM_VERSION
 }
 
 for chiave, valore in stato_iniziale.items():
     if chiave not in st.session_state:
         st.session_state[chiave] = valore
+
+# --- RESET DI SICUREZZA SE CAMBIA VERSIONE ALGORITMO ---
+if st.session_state.get("algorithm_version_sessione") != ALGORITHM_VERSION:
+    st.session_state.mattina_salvata = False
+    st.session_state.componenti_algoritmo = {}
+    st.session_state.ispezione_log = {}
+    st.session_state.valore_sem = None
+    st.session_state.algorithm_version_sessione = ALGORITHM_VERSION
 
 # --- FUNZIONE RE-TRY LOGIC ---
 def invia_richiesta_con_riconnessione(url, parametri):
@@ -434,7 +448,8 @@ with tab_mattina:
             'siesta': siesta, 
             'valore_sem': valore_calcolato,
             'ispezione_log': ispezione_giornata,
-            'componenti_algoritmo': componenti_algoritmo
+            'componenti_algoritmo': componenti_algoritmo,
+            'algorithm_version_sessione': ALGORITHM_VERSION
         })
         
         st.markdown("---") 
@@ -505,6 +520,35 @@ with tab_sera:
                 payload,
                 st.session_state.componenti_algoritmo
             )
+
+            # --- DEBUG TEMPORANEO PAYLOAD ---
+            if DEBUG_PAYLOAD:
+                st.warning("🔎 DEBUG ATTIVO: il payload viene mostrato ma NON inviato al Google Form.")
+
+                debug_payload = {
+                    "attivita_salvate_in_sessione": st.session_state.attivita,
+                    "componenti_algoritmo_in_sessione": st.session_state.componenti_algoritmo,
+                    "campi_attivita_binarie": {},
+                    "campi_componenti_algoritmo": {},
+                    "payload_completo": payload
+                }
+
+                for nome_attivita, entry_id in ENTRY_ID_ATTIVITA_BINARIE.items():
+                    debug_payload["campi_attivita_binarie"][nome_attivita] = {
+                        "entry_id": entry_id,
+                        "valore_payload": payload.get(entry_id, "NON PRESENTE")
+                    }
+
+                for nome_campo, entry_id in ENTRY_ID_COMPONENTI_ALGORITMO.items():
+                    debug_payload["campi_componenti_algoritmo"][nome_campo] = {
+                        "entry_id": entry_id,
+                        "valore_payload": payload.get(entry_id, "NON PRESENTE")
+                    }
+
+                with st.expander("🔎 Debug tecnico payload inviato", expanded=True):
+                    st.json(debug_payload)
+
+                st.stop()
             
             try:
                 r = requests.post(URL_MODULO, data=payload)
