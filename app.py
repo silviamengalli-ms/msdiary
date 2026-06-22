@@ -9,6 +9,9 @@ from streamlit_gsheets import GSheetsConnection
 # --- CONFIGURAZIONE PRINCIPALE ---
 st.set_page_config(page_title="Ogni Giorno - MS Diary", layout="centered", page_icon="🌱")
 
+# Versione algoritmo
+ALGORITHM_VERSION = "v1.4_componenti_algoritmo"
+
 # URL DI INVIO DATI PRINCIPALE (formResponse)
 URL_MODULO = "https://docs.google.com/forms/d/e/1FAIpQLSfsNrtCcCMKrQ22pM-7NfrW7F9xWvtUSZPNBu83AgV9ZyWtDQ/formResponse"
 
@@ -71,6 +74,20 @@ ENTRY_ID_ATTIVITA_BINARIE = {
     "sociale": "entry.161079508"
 }
 
+# --- COMPONENTI TECNICI DELL'ALGORITMO ---
+ENTRY_ID_COMPONENTI_ALGORITMO = {
+    "score_base": "entry.1056798586",
+    "score_finale": "entry.1283305482",
+    "accumulo_72h": "entry.855647667",
+    "impatto_clima": "entry.958624041",
+    "temp_percepita": "entry.1502555947",
+    "clima_escluso_domestico": "entry.1857183538",
+    "impatto_attivita": "entry.1609460021",
+    "extra_sovrapposizione_attivita": "entry.1934567396",
+    "numero_attivita": "entry.17107954",
+    "algorithm_version": "entry.1391757482"
+}
+
 # --- STATO INIZIALE ---
 stato_iniziale = {
     'mattina_salvata': False,
@@ -84,7 +101,8 @@ stato_iniziale = {
     'attivita': [], 
     'siesta': False,  
     'valore_sem': None,
-    'ispezione_log': {}
+    'ispezione_log': {},
+    'componenti_algoritmo': {}
 }
 
 for chiave, valore in stato_iniziale.items():
@@ -260,6 +278,23 @@ def aggiungi_attivita_strutturate_al_payload(payload, attivita_selezionate):
 
     return payload
 
+# --- FUNZIONE: COMPONENTI TECNICI DELL'ALGORITMO NEL PAYLOAD ---
+def aggiungi_componenti_algoritmo_al_payload(payload, componenti):
+    """
+    Aggiunge al payload i componenti tecnici del calcolo mattutino.
+    Questi dati servono per analisi futura e algoritmo predittivo.
+    """
+
+    componenti = componenti or {}
+
+    for nome_campo, entry_id in ENTRY_ID_COMPONENTI_ALGORITMO.items():
+        valore = componenti.get(nome_campo, None)
+
+        if entry_id and valore is not None:
+            payload[entry_id] = str(valore)
+
+    return payload
+
 # --- INTERFACCIA UTENTE ---
 st.title("🌱 Ogni Giorno")
 st.markdown("---")
@@ -354,8 +389,21 @@ with tab_mattina:
             + bonus_siesta
         )
 
-        score_finale = score_base - accumulo
-        valore_calcolato = round(max(1.0, min(10.0, score_finale)), 1)
+        score_ponderato_raw = score_base - accumulo
+        valore_calcolato = round(max(1.0, min(10.0, score_ponderato_raw)), 1)
+
+        componenti_algoritmo = {
+            "score_base": round(score_base, 2),
+            "score_finale": valore_calcolato,
+            "accumulo_72h": round(accumulo, 2),
+            "impatto_clima": round(p_temp, 2),
+            "temp_percepita": round(temp_percepita, 1),
+            "clima_escluso_domestico": "si" if solo_attivita_domestiche else "no",
+            "impatto_attivita": round(somma_att, 2),
+            "extra_sovrapposizione_attivita": round(mult_attivita_extra, 2),
+            "numero_attivita": len(attivita),
+            "algorithm_version": ALGORITHM_VERSION
+        }
         
         ispezione_giornata = {
             "Valore Energetico al Risveglio": round(energia * 0.3, 2),
@@ -385,7 +433,8 @@ with tab_mattina:
             'attivita': attivita,
             'siesta': siesta, 
             'valore_sem': valore_calcolato,
-            'ispezione_log': ispezione_giornata
+            'ispezione_log': ispezione_giornata,
+            'componenti_algoritmo': componenti_algoritmo
         })
         
         st.markdown("---") 
@@ -450,6 +499,11 @@ with tab_sera:
             payload = aggiungi_attivita_strutturate_al_payload(
                 payload,
                 st.session_state.attivita
+            )
+
+            payload = aggiungi_componenti_algoritmo_al_payload(
+                payload,
+                st.session_state.componenti_algoritmo
             )
             
             try:
