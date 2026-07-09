@@ -10,7 +10,7 @@ from streamlit_gsheets import GSheetsConnection
 st.set_page_config(page_title="Ogni Giorno - MS Diary", layout="centered", page_icon="🌱")
 
 # Versione algoritmo
-ALGORITHM_VERSION = "v1.4_componenti_algoritmo"
+ALGORITHM_VERSION = "v1.5_feedback_energetico_likert"
 
 # Debug temporaneo:
 # True = mostra il payload e blocca l'invio al Google Form
@@ -33,6 +33,8 @@ ENTRY_ID = {
     'semaforo': 'entry.625659299',
     'siesta_form': 'entry.1353678088', 
     'dolore': 'entry.672372933',
+    # Ex campo Match/Overestimated/Underestimated.
+    # Ora usato per salvare il feedback energetico serale 1-10.
     'valutazione': 'entry.2023032977',
     'note': 'entry.158362423',
     'crash': 'entry.592499523'
@@ -150,23 +152,57 @@ def calcola_accumulo_72ore():
     try:
         conn = st.connection("gsheets", type=GSheetsConnection)
         df = conn.read(ttl="1m") 
-        
+
         if df is None or len(df) < 3:
             ispezione["status"] = "Storico insufficiente"
             return 0.0, "Storico insufficiente nel database", ispezione
-        
+
         ispezione["righe_rilevate"] = len(df)
 
         colonna_crash = [c for c in df.columns if 'crash' in c.lower()]
-        colonna_match = [c for c in df.columns if 'valutazione' in c.lower() or 'riscontro' in c.lower()]
-        
+
+        # Nuovo feedback serale 1-10: semaforo energetico effettivo.
+        # Il vecchio Match/Overestimated/Underestimated resta gestito solo come compatibilità storica.
+        colonna_feedback = [
+            c for c in df.columns
+            if (
+                ('feedback' in c.lower() and ('energetico' in c.lower() or 'semaforo' in c.lower()))
+                or 'semaforo effettivo' in c.lower()
+            )
+        ]
+
+        colonna_match_legacy = [
+            c for c in df.columns
+            if 'valutazione' in c.lower() or 'riscontro' in c.lower()
+        ]
+
+        # Semaforo/punteggio previsto al mattino.
+        colonna_semaforo_previsto = [
+            c for c in df.columns
+            if (
+                ('semaforo' in c.lower() or 'punteggio' in c.lower())
+                and 'feedback' not in c.lower()
+                and 'effettivo' not in c.lower()
+            )
+        ]
+
         if not colonna_crash:
             ispezione["status"] = "Colonna crash mancante"
             return 0.0, "Nessun accumulo attivo (Manca colonna Crash)", ispezione
-            
+
         col_c = colonna_crash[0]
-        col_m = colonna_match[0] if colonna_match else None
-        
+        col_feedback = colonna_feedback[0] if colonna_feedback else None
+        col_match_legacy = colonna_match_legacy[0] if colonna_match_legacy else None
+        col_semaforo_previsto = colonna_semaforo_previsto[0] if colonna_semaforo_previsto else None
+
+        def parse_numero(valore):
+            try:
+                if pd.isna(valore):
+                    return None
+                return float(str(valore).replace(",", ".").strip())
+            except Exception:
+                return None
+
         ultimi_3_giorni = df.tail(3).to_dict('records')
         giorni_etichette = ['ieri', 'due_giorni', 'tre_giorni']
         pesi_temporali = {
@@ -174,37 +210,54 @@ def calcola_accumulo_72ore():
             'due_giorni': 0.5,
             'tre_giorni': 0.25
         }
-        
+
         accumulo_totale = 0.0
         dettaglio_log = []
-        
+
         for i, etichetta in enumerate(reversed(giorni_etichette)):
             record = ultimi_3_giorni[i]
 
             val_crash = str(record.get(col_c, '0')).strip().lower()
-            val_match = str(record.get(col_m, '')).strip() if col_m else "N/D"
-            
+
+            feedback_num = parse_numero(record.get(col_feedback, None)) if col_feedback else None
+            semaforo_previsto_num = parse_numero(record.get(col_semaforo_previsto, None)) if col_semaforo_previsto else None
+
+            scarto_feedback = None
+            if feedback_num is not None and semaforo_previsto_num is not None:
+                scarto_feedback = round(feedback_num - semaforo_previsto_num, 1)
+
+            val_match_legacy = str(record.get(col_match_legacy, '')).strip() if col_match_legacy else "N/D"
+
             info_giorno = {
                 "giorno": etichetta,
                 "crash_rilevato": val_crash,
-                "riscontro_serale": val_match,
+                "feedback_energetico": feedback_num if feedback_num is not None else "N/D",
+                "semaforo_previsto": semaforo_previsto_num if semaforo_previsto_num is not None else "N/D",
+                "scarto_feedback": scarto_feedback if scarto_feedback is not None else "N/D",
+                "riscontro_legacy": val_match_legacy,
                 "peso_temporale": pesi_temporali[etichetta],
                 "penalita_applicata": 0.0
             }
-            
+
             if val_crash.startswith('1') or 'si' in val_crash or 'sì' in val_crash:
                 impatto = 1.5 * pesi_temporali[etichetta]
 
-                if val_match == "Underestimated":
+                # Se il feedback serale è almeno 2 punti sotto il semaforo previsto,
+                # significa che il mattino è stato troppo ottimistico: aumento prudenziale accumulo.
+                if scarto_feedback is not None and scarto_feedback <= -2:
                     impatto *= 1.5
-                    info_giorno["moltiplicatore_protezione"] = "Attivo (x1.5)"
-                
+                    info_giorno["moltiplicatore_protezione"] = "Attivo (feedback almeno 2 punti peggiore del previsto)"
+                elif val_match_legacy == "Underestimated":
+                    # Compatibilità con lo storico precedente Match/Over/Under.
+                    impatto *= 1.5
+                    info_giorno["moltiplicatore_protezione"] = "Attivo legacy (Underestimated x1.5)"
+
                 accumulo_totale += impatto
                 info_giorno["penalita_applicata"] = round(impatto, 2)
                 dettaglio_log.append(f"{etichetta} (-{round(impatto, 2)})")
-                
+
             ispezione["dettaglio_giorni"].append(info_giorno)
-            
+
         stringa_report = " + ".join(dettaglio_log) if dettaglio_log else "Nessun sovraccarico rilevato."
         ispezione["status"] = "Calcolo completato con successo"
 
@@ -482,10 +535,22 @@ with tab_sera:
             horizontal=True
         )
         
-        valutazione = st.selectbox(
-            "Il punteggio del mattino era corretto? (Riscontro):",
-            ["Match", "Overestimated", "Underestimated"]
+        feedback_energetico = st.slider(
+            "🔁 Feedback energetico serale: com'è stata davvero la giornata? (1-10)",
+            min_value=1,
+            max_value=10,
+            value=max(1, min(10, int(round(st.session_state.valore_sem)))),
+            help="1 = giornata molto critica / energia minima; 5 = faticosa ma gestibile; 10 = pienamente sostenibile."
         )
+
+        scarto_feedback_live = round(feedback_energetico - st.session_state.valore_sem, 1)
+
+        if scarto_feedback_live <= -2:
+            st.caption(f"Il feedback è {abs(scarto_feedback_live)} punti sotto la previsione: semaforo probabilmente troppo ottimistico.")
+        elif scarto_feedback_live >= 2:
+            st.caption(f"Il feedback è {scarto_feedback_live} punti sopra la previsione: semaforo probabilmente troppo prudente.")
+        else:
+            st.caption("Feedback abbastanza coerente con il semaforo del mattino.")
 
         dolore = st.slider("Livello dolore avvertito (1-10):", 1, 10, 1)
         note = st.text_area("Note o riflessioni serali:", placeholder="Scrivi qui le tue annotazioni...")
@@ -505,7 +570,7 @@ with tab_sera:
                 ENTRY_ID['passi']: st.session_state.passi, 
                 ENTRY_ID['semaforo']: str(semaforo_protetto),
                 ENTRY_ID['siesta_form']: "si" if st.session_state.siesta else "no", 
-                ENTRY_ID['valutazione']: valutazione,
+                ENTRY_ID['valutazione']: str(int(feedback_energetico)),
                 ENTRY_ID['dolore']: str(int(dolore)), 
                 ENTRY_ID['note']: note_finali,
                 ENTRY_ID['crash']: crash_scelta 
@@ -609,7 +674,11 @@ with st.sidebar:
             for giorno in db_debug["dettaglio_giorni"]:
                 with st.expander(f"📅 Analisi {giorno['giorno'].upper()}"):
                     st.write(f"**Crash registrato:** `{giorno['crash_rilevato']}`")
-                    st.write(f"**Riscontro serale:** `{giorno['riscontro_serale']}`")
+                    st.write(f"**Feedback energetico serale:** `{giorno.get('feedback_energetico', 'N/D')}`")
+                    st.write(f"**Semaforo previsto:** `{giorno.get('semaforo_previsto', 'N/D')}`")
+                    st.write(f"**Scarto feedback:** `{giorno.get('scarto_feedback', 'N/D')}`")
+                    if giorno.get("riscontro_legacy", "N/D") not in ["", "N/D"]:
+                        st.write(f"**Riscontro storico legacy:** `{giorno.get('riscontro_legacy')}`")
                     st.write(f"**Peso temporale:** {giorno['peso_temporale'] * 100}%")
 
                     if "moltiplicatore_protezione" in giorno:
