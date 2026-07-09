@@ -10,7 +10,7 @@ from streamlit_gsheets import GSheetsConnection
 st.set_page_config(page_title="Ogni Giorno - MS Diary", layout="centered", page_icon="🌱")
 
 # Versione algoritmo
-ALGORITHM_VERSION = "v1.5_feedback_energetico_likert"
+ALGORITHM_VERSION = "v1.6_caldo_domestico_ricalibrato"
 
 # Debug temporaneo:
 # True = mostra il payload e blocca l'invio al Google Form
@@ -68,6 +68,10 @@ ATTIVITA_DOMESTICHE = {
     "lavoro da casa",
     "riposo totale"
 }
+
+# Se le attività sono solo domestiche, il caldo non viene più escluso del tutto:
+# viene considerato al 35%, perché anche in casa il caldo può incidere sulla fatica.
+FATTORE_CLIMA_DOMESTICO = 0.35
 
 # Nuovi campi tecnici Google Moduli: 1 = attività selezionata, 0 = attività non selezionata
 ENTRY_ID_ATTIVITA_BINARIE = {
@@ -413,21 +417,25 @@ with tab_mattina:
             mult_attivita_extra = 0.0
             
         # --- LOGICA COMBINATA: CALORE + UMIDITÀ ---
-        # Se sono selezionate solo attività domestiche, la penalizzazione climatica esterna viene esclusa.
+        # Il caldo viene sempre calcolato.
+        # Se sono selezionate solo attività domestiche, la penalità non viene azzerata:
+        # viene ridotta al 35%, perché anche in casa il caldo può incidere sulla fatica.
         solo_attivita_domestiche = (
             len(attivita) > 0 and all(a in ATTIVITA_DOMESTICHE for a in attivita)
         )
 
         temp_percepita = temp
 
+        if temp >= 27.0 and umidita > 60:
+            gradi_extra_umidita = ((umidita - 60) / 10.0) * 0.5
+            temp_percepita = temp + gradi_extra_umidita
+
+        p_temp_pieno = 0.0 if temp_percepita < 28.0 else -0.5 - ((temp_percepita - 28.0) * 0.3)
+
         if solo_attivita_domestiche:
-            p_temp = 0.0
+            p_temp = p_temp_pieno * FATTORE_CLIMA_DOMESTICO
         else:
-            if temp >= 27.0 and umidita > 60:
-                gradi_extra_umidita = ((umidita - 60) / 10.0) * 0.5
-                temp_percepita = temp + gradi_extra_umidita
-                
-            p_temp = 0.0 if temp_percepita < 28.0 else -0.5 - ((temp_percepita - 28.0) * 0.3)
+            p_temp = p_temp_pieno
         
         # --- LOGICA SONNO FISIOLOGICA ---
         peso_sonno = {
@@ -438,7 +446,7 @@ with tab_mattina:
         
         # --- LOGICA PASSI E SIESTA BILANCIATA ---
         peso_passi = {
-            "fino a 1000": 0.2,
+            "fino a 1000": 0.0,
             "da 1001 a 3000": -0.2,
             "oltre 3000": -0.5
         }[passi]
@@ -465,7 +473,7 @@ with tab_mattina:
             "accumulo_72h": round(accumulo, 2),
             "impatto_clima": round(p_temp, 2),
             "temp_percepita": round(temp_percepita, 1),
-            "clima_escluso_domestico": "si" if solo_attivita_domestiche else "no",
+            "clima_escluso_domestico": "ridotto" if solo_attivita_domestiche else "no",
             "impatto_attivita": round(somma_att, 2),
             "extra_sovrapposizione_attivita": round(mult_attivita_extra, 2),
             "numero_attivita": len(attivita),
@@ -479,7 +487,7 @@ with tab_mattina:
             label_attivita: round(somma_att, 2),
             "Accumulo da Sovrapposizione Impegni": round(mult_attivita_extra, 2),
             "Meteo: Temperatura con Afa": f"{round(temp_percepita, 1)} °C",
-            "Clima escluso per attività domestica": "sì" if solo_attivita_domestiche else "no",
+            "Clima domestico": "penalità climatica ridotta al 35%" if solo_attivita_domestiche else "penalità climatica piena",
             "Impatto Clima Esterno": round(p_temp, 2),
             "Bonus Strategico Siesta": bonus_siesta,
             "VALORE DI BASE ODIERNO": round(score_base, 2),
