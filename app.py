@@ -10,7 +10,7 @@ from streamlit_gsheets import GSheetsConnection
 st.set_page_config(page_title="Ogni Giorno - MS Diary", layout="centered", page_icon="🌱")
 
 # Versione algoritmo
-ALGORITHM_VERSION = "v1.6_caldo_domestico_ricalibrato"
+ALGORITHM_VERSION = "v1.7_accumulo_solo_crash"
 
 # Debug temporaneo:
 # True = mostra il payload e blocca l'invio al Google Form
@@ -244,17 +244,10 @@ def calcola_accumulo_72ore():
             }
 
             if val_crash.startswith('1') or 'si' in val_crash or 'sì' in val_crash:
+                # L'accumulo 72h dipende solo dalla presenza di crash/sovraccarico.
+                # Il feedback energetico serale resta un dato di calibrazione/osservazione,
+                # ma non amplifica direttamente la penalità dei giorni successivi.
                 impatto = 1.5 * pesi_temporali[etichetta]
-
-                # Se il feedback serale è almeno 2 punti sotto il semaforo previsto,
-                # significa che il mattino è stato troppo ottimistico: aumento prudenziale accumulo.
-                if scarto_feedback is not None and scarto_feedback <= -2:
-                    impatto *= 1.5
-                    info_giorno["moltiplicatore_protezione"] = "Attivo (feedback almeno 2 punti peggiore del previsto)"
-                elif val_match_legacy == "Underestimated":
-                    # Compatibilità con lo storico precedente Match/Over/Under.
-                    impatto *= 1.5
-                    info_giorno["moltiplicatore_protezione"] = "Attivo legacy (Underestimated x1.5)"
 
                 accumulo_totale += impatto
                 info_giorno["penalita_applicata"] = round(impatto, 2)
@@ -690,6 +683,6 @@ with st.sidebar:
                     st.write(f"**Peso temporale:** {giorno['peso_temporale'] * 100}%")
 
                     if "moltiplicatore_protezione" in giorno:
-                        st.warning("⚠️ Scudo attivo (Sotto-stimato x1.5)")
+                        st.caption("Nota: il feedback energetico è registrato come dato osservativo, non come moltiplicatore dell’accumulo.")
 
                     st.write(f"**Penalità calcolata:** -{giorno['penalita_applicata']}")
