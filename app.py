@@ -10,7 +10,7 @@ from streamlit_gsheets import GSheetsConnection
 st.set_page_config(page_title="Ogni Giorno - MS Diary", layout="centered", page_icon="🌱")
 
 # Versione algoritmo
-ALGORITHM_VERSION = "v1.7_accumulo_solo_crash"
+ALGORITHM_VERSION = "v1.8"
 
 # Debug temporaneo:
 # True = mostra il payload e blocca l'invio al Google Form
@@ -72,6 +72,12 @@ ATTIVITA_DOMESTICHE = {
 # Se le attività sono solo domestiche, il caldo non viene più escluso del tutto:
 # viene considerato al 35%, perché anche in casa il caldo può incidere sulla fatica.
 FATTORE_CLIMA_DOMESTICO = 0.35
+
+# Attività che hanno un peso proprio, ma non contano come "impegno"
+# nella penalità per attività multiple.
+ATTIVITA_NON_CONTEGGIATE_PER_MULTIPLE = {
+    "riposo totale"
+}
 
 # Nuovi campi tecnici Google Moduli: 1 = attività selezionata, 0 = attività non selezionata
 ENTRY_ID_ATTIVITA_BINARIE = {
@@ -321,10 +327,7 @@ def recupera_meteo(data, nome_citta):
 
 # --- FUNZIONE: ATTIVITÀ STRUTTURATE NEL PAYLOAD ---
 def aggiungi_attivita_strutturate_al_payload(payload, attivita_selezionate):
-    """
-    Mantiene compatibilità con il vecchio campo 'attivita',
-    ma aggiunge anche colonne binarie 1/0 per il futuro algoritmo.
-    """
+
 
     attivita_selezionate = attivita_selezionate or []
     set_attivita = set(attivita_selezionate)
@@ -363,7 +366,7 @@ def aggiungi_componenti_algoritmo_al_payload(payload, componenti):
 st.title("🌱 Ogni Giorno")
 st.markdown("---")
 
-tab_mattina, tab_sera = st.tabs(["🌅 Pianifica la Mattina", "🌌 Feedback Serale"])
+tab_mattina, tab_sera = st.tabs(["🌅 Pianifica la Giornata", "🌌 Feedback Serale"])
 
 # ==========================================
 # TAB MATTINA
@@ -400,15 +403,27 @@ with tab_mattina:
         accumulo, log_accumulo, debug_data = calcola_accumulo_72ore()
         
         # --- CALCOLO IMPATTO ATTIVITÀ ---
+        # Ogni attività selezionata mantiene il proprio peso.
+        # "Riposo totale" può dare un bonus, ma non conta come impegno
+        # per la penalità da attività multiple.
         somma_att = sum([PESI_ATTIVITA[a] for a in attivita])
-        
+
+        attivita_conteggiate_per_multiple = [
+            a for a in attivita
+            if a not in ATTIVITA_NON_CONTEGGIATE_PER_MULTIPLE
+        ]
+
+        numero_attivita_penalizzanti = len(attivita_conteggiate_per_multiple)
+
         if len(attivita) > 1:
             label_attivita = "Impatto Sommatoria Attività"
-            mult_attivita_extra = (len(attivita) - 1) * -0.3
         else:
             label_attivita = "Impatto Attività Singola" if len(attivita) == 1 else "Nessuna Attività Selezionata"
+
+        if numero_attivita_penalizzanti > 1:
+            mult_attivita_extra = (numero_attivita_penalizzanti - 1) * -0.3
+        else:
             mult_attivita_extra = 0.0
-            
         # --- LOGICA COMBINATA: CALORE + UMIDITÀ ---
         # Il caldo viene sempre calcolato.
         # Se sono selezionate solo attività domestiche, la penalità non viene azzerata:
@@ -469,7 +484,7 @@ with tab_mattina:
             "clima_escluso_domestico": "ridotto" if solo_attivita_domestiche else "no",
             "impatto_attivita": round(somma_att, 2),
             "extra_sovrapposizione_attivita": round(mult_attivita_extra, 2),
-            "numero_attivita": len(attivita),
+            "numero_attivita": numero_attivita_penalizzanti,
             "algorithm_version": ALGORITHM_VERSION
         }
         
@@ -478,7 +493,7 @@ with tab_mattina:
             "Impatto Qualità del Sonno": peso_sonno,
             "Impatto Passi Previsti": peso_passi,
             label_attivita: round(somma_att, 2),
-            "Accumulo da Sovrapposizione Impegni": round(mult_attivita_extra, 2),
+            "Penalità per attività multiple": round(mult_attivita_extra, 2),
             "Meteo: Temperatura con Afa": f"{round(temp_percepita, 1)} °C",
             "Clima domestico": "penalità climatica ridotta al 35%" if solo_attivita_domestiche else "penalità climatica piena",
             "Impatto Clima Esterno": round(p_temp, 2),
